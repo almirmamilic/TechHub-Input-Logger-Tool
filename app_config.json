@@ -1,0 +1,59 @@
+{
+    "categories": {
+        "Zenput Options": [
+            "Bill of Lading [1]",
+            "Bill of Lading [2]",
+            "Bill of Lading [3]",
+            "Veeder Root",
+            "Payout",
+            "Coupon",
+            "Lottery",
+            "Titan Series",
+            "Change Order",
+            "QSR Safe Drops"
+        ],
+        "CNG Options": [
+            "Department Sales",
+            "Fuel Tier",
+            "EMR",
+            "NCR",
+            "NPR",
+            "Loyalty",
+            "Pop Discount",
+            "Drive Off",
+            "MOP",
+            "Adjusted Fuel Deposit",
+            "KKC"
+        ]
+    },
+    "multi_popups": {
+        "Titan Series": [
+            "Safe EOD Report",
+            "Safe Summary Report"
+        ],
+        "NCR": [
+            "Fleetwide",
+            "Fuelman",
+            "PumpPASS",
+            "Exxon Mobil G",
+            "Shell"
+        ],
+        "NPR": [
+            "E85",
+            "Diesel",
+            "Racing Fuel",
+            "Kerosene"
+        ],
+        "Loyalty": [
+            "600",
+            "888",
+            "800",
+            "211"
+        ]
+    },
+    "entry_popups": {
+        "Bill of Lading [1]": "BOL#",
+        "Bill of Lading [2]": "BOL#",
+        "Bill of Lading [3]": "BOL#"
+    }
+}
