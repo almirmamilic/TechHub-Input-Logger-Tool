@@ -16,6 +16,16 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 ICON_FILE = resource_path("app_icon.ico")
+COLORS = {
+    "background": "#F3F6FB",
+    "surface": "#FFFFFF",
+    "surface_alt": "#EAF0F8",
+    "text": "#182A43",
+    "muted": "#65758B",
+    "accent": "#2563EB",
+    "accent_active": "#1D4ED8",
+    "border": "#D8E1ED",
+}
 
 # ---------------------------
 # State Management
@@ -142,6 +152,7 @@ def clear_all():
 
 
 def activate_popup(window, initial_focus=None):
+    window.configure(background=COLORS["background"])
     window.iconbitmap(ICON_FILE)
     root.update_idletasks()
     window.update_idletasks()
@@ -213,18 +224,23 @@ def save_customizations(
 def add_option_checkbox(category_name, option_name):
     if option_name not in all_options:
         all_options[option_name] = tk.BooleanVar()
-    checkbox = tk.Checkbutton(
+    checkbox = ttk.Checkbutton(
         category_frames[category_name],
         text=option_name,
         variable=all_options[option_name],
         command=lambda n=option_name: on_checkbox_toggle(n),
     )
-    checkbox.pack(anchor="w")
+    checkbox.pack(anchor="w", fill="x", pady=4)
     option_widgets[option_name] = checkbox
 
 
 def add_category_tab(category_name):
-    frame = tk.Frame(options_notebook, padx=5, pady=5)
+    frame = tk.Frame(
+        options_notebook,
+        padx=14,
+        pady=12,
+        background=COLORS["surface"],
+    )
     category_frames[category_name] = frame
     options_notebook.add(frame, text=category_name)
     for option_name in category_options[category_name]:
@@ -1141,14 +1157,140 @@ def open_multi_checkbox_popup(name, options_list, selected_list):
 
 root = tk.Tk()
 root.title("Input Logger Tool")
-root.geometry("320x720") 
+root.geometry("360x750")
+root.resizable(True, True)
+root.configure(background=COLORS["background"])
 root.iconbitmap(ICON_FILE)
 root.iconbitmap(default=ICON_FILE)
 
-options_notebook = ttk.Notebook(root)
-timestamp_frame = tk.LabelFrame(root, text="Additional Options", padx=5, pady=5)
-options_notebook.pack(fill="both", expand=True, padx=10, pady=5)
-timestamp_frame.pack(fill="x", padx=10, pady=5)
+root.option_add("*Font", ("Segoe UI", 10))
+root.option_add("*Label.background", COLORS["background"])
+root.option_add("*Label.foreground", COLORS["text"])
+root.option_add("*Button.font", ("Segoe UI", 9, "bold"))
+root.option_add("*Button.background", COLORS["surface_alt"])
+root.option_add("*Button.foreground", COLORS["text"])
+root.option_add("*Button.activeBackground", "#DCE7F5")
+root.option_add("*Button.activeForeground", COLORS["text"])
+root.option_add("*Button.borderWidth", 0)
+root.option_add("*Checkbutton.background", COLORS["surface"])
+root.option_add("*Checkbutton.foreground", COLORS["text"])
+root.option_add("*Checkbutton.activeBackground", COLORS["surface"])
+root.option_add("*Checkbutton.activeForeground", COLORS["text"])
+root.option_add("*Entry.relief", "flat")
+
+style = ttk.Style(root)
+style.theme_use("clam")
+style.configure("TFrame", background=COLORS["background"])
+style.configure(
+    "TLabel",
+    background=COLORS["background"],
+    foreground=COLORS["text"],
+)
+style.configure(
+    "Header.TFrame",
+    background=COLORS["text"],
+)
+style.configure(
+    "HeaderTitle.TLabel",
+    background=COLORS["text"],
+    foreground=COLORS["surface"],
+    font=("Segoe UI", 17, "bold"),
+)
+style.configure(
+    "HeaderSubtitle.TLabel",
+    background=COLORS["text"],
+    foreground="#C8D5E7",
+    font=("Segoe UI", 9),
+)
+style.configure(
+    "TNotebook",
+    background=COLORS["background"],
+    borderwidth=0,
+    tabmargins=(0, 0, 0, 0),
+)
+style.configure(
+    "TNotebook.Tab",
+    background=COLORS["surface_alt"],
+    foreground=COLORS["muted"],
+    padding=(10, 5),
+    borderwidth=0,
+    font=("Segoe UI", 9, "bold"),
+)
+style.map(
+    "TNotebook.Tab",
+    background=[("selected", COLORS["surface"])],
+    foreground=[("selected", COLORS["accent"])],
+    padding=[("selected", (10, 5)), ("!selected", (10, 5))],
+    borderwidth=[("selected", 0), ("!selected", 0)],
+)
+style.configure(
+    "TCheckbutton",
+    background=COLORS["surface"],
+    foreground=COLORS["text"],
+    padding=(4, 3),
+)
+style.map(
+    "TCheckbutton",
+    foreground=[("active", COLORS["accent"])],
+    background=[("active", COLORS["surface"])],
+)
+style.configure(
+    "TLabelframe",
+    background=COLORS["surface"],
+    bordercolor=COLORS["border"],
+    relief="solid",
+)
+style.configure(
+    "TLabelframe.Label",
+    background=COLORS["surface"],
+    foreground=COLORS["muted"],
+    font=("Segoe UI", 9, "bold"),
+)
+style.configure(
+    "TButton",
+    background=COLORS["surface_alt"],
+    foreground=COLORS["text"],
+    padding=(14, 8),
+    borderwidth=0,
+    font=("Segoe UI", 9, "bold"),
+)
+style.map(
+    "TButton",
+    background=[("active", "#DCE7F5"), ("pressed", "#CFDDF0")],
+    foreground=[("active", COLORS["text"])],
+)
+style.configure(
+    "Accent.TButton",
+    background=COLORS["accent"],
+    foreground=COLORS["surface"],
+)
+style.map(
+    "Accent.TButton",
+    background=[("active", COLORS["accent_active"]), ("pressed", COLORS["accent_active"])],
+    foreground=[("active", COLORS["surface"])],
+)
+style.configure(
+    "TCombobox",
+    fieldbackground=COLORS["surface"],
+    background=COLORS["surface"],
+    foreground=COLORS["text"],
+    padding=5,
+)
+style.configure(
+    "TEntry",
+    fieldbackground=COLORS["surface"],
+    foreground=COLORS["text"],
+    padding=5,
+)
+
+options_notebook = ttk.Notebook(root, height=0)
+options_notebook.pack(fill="both", expand=True, padx=16, pady=(8, 8))
+timestamp_frame = ttk.LabelFrame(
+    root,
+    text="  Additional Options  ",
+    padding=(12, 8),
+)
+timestamp_frame.pack(fill="x", padx=16, pady=6)
 
 default_category_options = {
     "Crunchtime": ["Bill Of Lading [1]", "Bill Of Lading [2]", "Bill Of Lading [3]", "Veeder Root", "Payout", "Coupon", "Lottery", "Titan Series", "Change Order"],
@@ -1365,17 +1507,54 @@ for category_name in category_options:
     add_category_tab(category_name)
 
 for name in additional_options:
-    tk.Checkbutton(timestamp_frame, text=name, variable=all_options[name], 
-                   command=lambda n=name: on_checkbox_toggle(n)).pack(anchor="w")
+    ttk.Checkbutton(
+        timestamp_frame,
+        text=name,
+        variable=all_options[name],
+        command=lambda n=name: on_checkbox_toggle(n),
+    ).pack(anchor="w")
 
-result_frame = tk.Frame(root)
-result_frame.pack(fill="x", padx=10, pady=5)
-result = tk.Text(result_frame, height=5, width=32, state="disabled")
-result.pack(pady=5)
-btn_frame = tk.Frame(result_frame)
-btn_frame.pack()
-tk.Button(btn_frame, text="Copy", width=12, command=copy_to_clipboard).pack(side="left", padx=5)
-tk.Button(btn_frame, text="Clear", width=12, command=clear_all).pack(side="left", padx=5)
+result_frame = tk.Frame(root, background=COLORS["background"])
+result_frame.pack(fill="x", padx=16, pady=(8, 12))
+result = tk.Text(
+    result_frame,
+    height=4,
+    width=1,
+    state="disabled",
+    wrap="word",
+    font=("Segoe UI", 10),
+    bg=COLORS["surface"],
+    fg=COLORS["text"],
+    insertbackground=COLORS["text"],
+    relief="flat",
+    highlightthickness=1,
+    highlightbackground=COLORS["border"],
+    highlightcolor=COLORS["accent"],
+    padx=10,
+    pady=9,
+)
+result.pack(fill="x", pady=(0, 10))
+ttk.Label(
+    result_frame,
+    text="Credited to Maal",
+    font=("Segoe UI", 8),
+    foreground=COLORS["muted"],
+).pack(anchor="center", pady=(0, 6))
+btn_frame = tk.Frame(result_frame, background=COLORS["background"])
+btn_frame.pack(anchor="center")
+ttk.Button(
+    btn_frame,
+    text="Copy",
+    style="Accent.TButton",
+    width=12,
+    command=copy_to_clipboard,
+).pack(side="left")
+ttk.Button(
+    btn_frame,
+    text="Clear",
+    width=12,
+    command=clear_all,
+).pack(side="left", padx=(8, 0))
 
 def refresh_timestamp():
     if all_options["Timestamp"].get(): update_result()
@@ -1397,7 +1576,6 @@ root.bind_all("<KeyPress-d>", navigate_tabs)
 root.bind_all("<KeyPress-D>", navigate_tabs)
 root.bind_all("<Left>", navigate_tabs)
 root.bind_all("<Right>", navigate_tabs)
-tk.Label(root, text="Credited to Maal", font=("Arial", 7), fg="gray").pack(side="bottom", pady=2)
 root.update_idletasks()
-root.minsize(320, root.winfo_reqheight())
+root.minsize(btn_frame.winfo_reqwidth() + 32, root.winfo_reqheight())
 root.mainloop()
