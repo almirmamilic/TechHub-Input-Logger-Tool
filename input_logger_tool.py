@@ -1147,8 +1147,8 @@ root.iconbitmap(default=ICON_FILE)
 
 options_notebook = ttk.Notebook(root)
 timestamp_frame = tk.LabelFrame(root, text="Additional Options", padx=5, pady=5)
-options_notebook.pack(fill="both", padx=10, pady=5)
-timestamp_frame.pack(fill="both", padx=10, pady=5)
+options_notebook.pack(fill="both", expand=True, padx=10, pady=5)
+timestamp_frame.pack(fill="x", padx=10, pady=5)
 
 default_category_options = {
     "Crunchtime": ["Bill Of Lading [1]", "Bill Of Lading [2]", "Bill Of Lading [3]", "Veeder Root", "Payout", "Coupon", "Lottery", "Titan Series", "Change Order"],
@@ -1369,7 +1369,7 @@ for name in additional_options:
                    command=lambda n=name: on_checkbox_toggle(n)).pack(anchor="w")
 
 result_frame = tk.Frame(root)
-result_frame.pack(fill="both", padx=10, pady=10)
+result_frame.pack(fill="x", padx=10, pady=5)
 result = tk.Text(result_frame, height=5, width=32, state="disabled")
 result.pack(pady=5)
 btn_frame = tk.Frame(result_frame)
@@ -1398,4 +1398,6 @@ root.bind_all("<KeyPress-D>", navigate_tabs)
 root.bind_all("<Left>", navigate_tabs)
 root.bind_all("<Right>", navigate_tabs)
 tk.Label(root, text="Credited to Maal", font=("Arial", 7), fg="gray").pack(side="bottom", pady=2)
+root.update_idletasks()
+root.minsize(320, root.winfo_reqheight())
 root.mainloop()
