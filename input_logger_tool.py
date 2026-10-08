@@ -151,7 +151,7 @@ def activate_popup(window, initial_focus=None):
         initial_focus.focus_force()
 
 
-def save_customizations(categories, options):
+def save_customizations(categories, options, removed_category_names=None, removed_option_names=None):
     config_dir = os.path.join(
         os.environ.get("APPDATA", os.path.expanduser("~")),
         "TechHub Input Logger Tool",
@@ -161,7 +161,16 @@ def save_customizations(categories, options):
         os.makedirs(config_dir, exist_ok=True)
         with open(config_path, "w", encoding="utf-8") as config_file:
             json.dump(
-                {"categories": categories, "options": options},
+                {
+                    "categories": categories,
+                    "options": options,
+                    "removed_categories": sorted(
+                        hidden_categories if removed_category_names is None else removed_category_names
+                    ),
+                    "removed_options": sorted(
+                        hidden_options if removed_option_names is None else removed_option_names
+                    ),
+                },
                 config_file,
                 indent=2,
             )
@@ -204,6 +213,9 @@ def add_new_category():
     if not category_name:
         messagebox.showwarning("Invalid Category", "Category name cannot be empty.", parent=root)
         return
+    if any(name.casefold() == category_name.casefold() for name in default_category_options):
+        messagebox.showwarning("Duplicate Category", "That category name is reserved.", parent=root)
+        return
     if any(name.casefold() == category_name.casefold() for name in category_frames):
         messagebox.showwarning("Duplicate Category", "That category already exists.", parent=root)
         return
@@ -218,6 +230,14 @@ def add_new_category():
 
 
 def add_new_option():
+    if not category_frames:
+        messagebox.showinfo(
+            "Add New Option",
+            "Add a category before adding an option.",
+            parent=root,
+        )
+        return
+
     dialog = tk.Toplevel(root)
     dialog.title("Add New Option")
     dialog.geometry("300x150")
@@ -242,7 +262,16 @@ def add_new_option():
             messagebox.showwarning("Invalid Option", "Option name cannot be empty.", parent=dialog)
             name_entry.focus_set()
             return
-        if any(name.casefold() == option_name.casefold() for name in all_options):
+        reserved_options = {
+            name.casefold()
+            for option_names in default_category_options.values()
+            for name in option_names
+        }
+        if (
+            option_name.casefold() == "timestamp"
+            or option_name.casefold() in reserved_options
+            or any(name.casefold() == option_name.casefold() for name in all_options)
+        ):
             messagebox.showwarning("Duplicate Option", "That option already exists.", parent=dialog)
             name_entry.focus_set()
             return
@@ -297,6 +326,221 @@ def show_add_choices(event=None):
     ).pack(side="left", padx=5)
     popup.bind("<Escape>", lambda key_event: popup.destroy())
     activate_popup(popup, add_category_button)
+
+
+def remove_option_state(option_name):
+    all_options.pop(option_name, None)
+    if option_name in click_order:
+        click_order.remove(option_name)
+    if option_name == "NCR":
+        ncr_selected.clear()
+    elif option_name == "NPR":
+        npr_selected.clear()
+    elif option_name == "Loyalty":
+        loyalty_selected.clear()
+    elif option_name == "Lottery":
+        lottery_selected.clear()
+    elif option_name == "Bill Of Lading [1]":
+        bol1_value.set("")
+    elif option_name == "Bill Of Lading [2]":
+        bol2_value.set("")
+    elif option_name == "Bill Of Lading [3]":
+        bol3_value.set("")
+
+
+def remove_category(category_name):
+    if not messagebox.askyesno(
+        "Remove Category",
+        f"Remove the '{category_name}' category and all its options?",
+        parent=root,
+    ):
+        return
+
+    new_custom_categories = {
+        name: list(option_names)
+        for name, option_names in custom_categories.items()
+        if name != category_name
+    }
+    new_custom_options = {
+        name: list(option_names)
+        for name, option_names in custom_options.items()
+        if name != category_name
+    }
+    new_hidden_categories = set(hidden_categories)
+    if category_name in default_category_options:
+        new_hidden_categories.add(category_name)
+    if not save_customizations(
+        new_custom_categories,
+        new_custom_options,
+        new_hidden_categories,
+        hidden_options,
+    ):
+        return
+
+    removed_options = list(category_options[category_name])
+    hidden_categories.clear()
+    hidden_categories.update(new_hidden_categories)
+    custom_categories.clear()
+    custom_categories.update(new_custom_categories)
+    custom_options.clear()
+    custom_options.update(new_custom_options)
+    options_notebook.forget(category_frames[category_name])
+    category_frames.pop(category_name).destroy()
+    category_options.pop(category_name)
+    for option_name in removed_options:
+        remove_option_state(option_name)
+    update_result()
+
+
+def remove_option(category_name, option_name):
+    if not messagebox.askyesno(
+        "Remove Option",
+        f"Remove '{option_name}' from '{category_name}'?",
+        parent=root,
+    ):
+        return
+
+    new_custom_options = {
+        name: list(option_names)
+        for name, option_names in custom_options.items()
+    }
+    new_hidden_options = set(hidden_options)
+    if option_name in new_custom_options.get(category_name, []):
+        new_custom_options[category_name].remove(option_name)
+        if not new_custom_options[category_name]:
+            new_custom_options.pop(category_name)
+    else:
+        new_hidden_options.add(option_name)
+    if not save_customizations(
+        custom_categories,
+        new_custom_options,
+        hidden_categories,
+        new_hidden_options,
+    ):
+        return
+
+    custom_options.clear()
+    custom_options.update(new_custom_options)
+    hidden_options.clear()
+    hidden_options.update(new_hidden_options)
+    category_options[category_name].remove(option_name)
+    for widget in category_frames[category_name].winfo_children():
+        if widget.cget("text") == option_name:
+            widget.destroy()
+            break
+    remove_option_state(option_name)
+    update_result()
+
+
+def choose_category_to_remove():
+    if not category_frames:
+        messagebox.showinfo("Remove Category", "There are no categories to remove.", parent=root)
+        return
+
+    popup = tk.Toplevel(root)
+    popup.title("Remove Category")
+    popup.geometry("300x120")
+    popup.transient(root)
+    tk.Label(popup, text="Choose a category to remove:").pack(padx=10, pady=(12, 4))
+    category_choice = ttk.Combobox(
+        popup,
+        values=list(category_frames),
+        state="readonly",
+    )
+    category_choice.pack(fill="x", padx=10)
+    category_choice.current(0)
+
+    def confirm(event=None):
+        category_name = category_choice.get()
+        popup.destroy()
+        remove_category(category_name)
+
+    buttons = tk.Frame(popup)
+    buttons.pack(pady=10)
+    tk.Button(buttons, text="Remove", width=10, command=confirm).pack(side="left", padx=5)
+    tk.Button(buttons, text="Cancel", width=10, command=popup.destroy).pack(side="left", padx=5)
+    popup.bind("<Return>", confirm)
+    popup.bind("<Escape>", lambda event: popup.destroy())
+    activate_popup(popup, category_choice)
+
+
+def choose_option_to_remove():
+    available_categories = [
+        name for name, option_names in category_options.items() if option_names
+    ]
+    if not available_categories:
+        messagebox.showinfo("Remove Option", "There are no options to remove.", parent=root)
+        return
+
+    popup = tk.Toplevel(root)
+    popup.title("Remove Option")
+    popup.geometry("300x180")
+    popup.transient(root)
+    tk.Label(popup, text="Choose a category and option to remove:").pack(
+        anchor="w",
+        padx=10,
+        pady=(10, 4),
+    )
+    category_choice = ttk.Combobox(
+        popup,
+        values=available_categories,
+        state="readonly",
+    )
+    category_choice.pack(fill="x", padx=10)
+    category_choice.current(0)
+    option_choice = ttk.Combobox(popup, state="readonly")
+    option_choice.pack(fill="x", padx=10, pady=(8, 0))
+
+    def update_option_choices(event=None):
+        option_choice["values"] = category_options[category_choice.get()]
+        option_choice.current(0)
+
+    category_choice.bind("<<ComboboxSelected>>", update_option_choices)
+    update_option_choices()
+
+    def confirm(event=None):
+        category_name = category_choice.get()
+        option_name = option_choice.get()
+        popup.destroy()
+        remove_option(category_name, option_name)
+
+    buttons = tk.Frame(popup)
+    buttons.pack(pady=10)
+    tk.Button(buttons, text="Remove", width=10, command=confirm).pack(side="left", padx=5)
+    tk.Button(buttons, text="Cancel", width=10, command=popup.destroy).pack(side="left", padx=5)
+    popup.bind("<Return>", confirm)
+    popup.bind("<Escape>", lambda event: popup.destroy())
+    activate_popup(popup, category_choice)
+
+
+def show_remove_choices(event=None):
+    if event is not None and event.widget.winfo_toplevel() is not root:
+        return
+
+    popup = tk.Toplevel(root)
+    popup.title("Remove")
+    popup.geometry("280x90")
+    popup.transient(root)
+
+    def choose(action):
+        popup.destroy()
+        action()
+
+    buttons = tk.Frame(popup)
+    buttons.pack(expand=True)
+    remove_category_button = tk.Button(
+        buttons,
+        text="Remove Category",
+        command=lambda: choose(choose_category_to_remove),
+    )
+    remove_category_button.pack(side="left", padx=5)
+    tk.Button(
+        buttons,
+        text="Remove Option",
+        command=lambda: choose(choose_option_to_remove),
+    ).pack(side="left", padx=5)
+    popup.bind("<Escape>", lambda key_event: popup.destroy())
+    activate_popup(popup, remove_category_button)
 
 
 # ---------------------------
@@ -383,9 +627,13 @@ timestamp_frame = tk.LabelFrame(root, text="Additional Options", padx=5, pady=5)
 options_notebook.pack(fill="both", padx=10, pady=5)
 timestamp_frame.pack(fill="both", padx=10, pady=5)
 
-category_options = {
+default_category_options = {
     "Crunchtime": ["Bill Of Lading [1]", "Bill Of Lading [2]", "Bill Of Lading [3]", "Veeder Root", "Payout", "Coupon", "Lottery", "Titan Series", "Change Order"],
     "CNG": ["EMR", "NCR", "NPR", "Loyalty", "Drive Off", "Pop Discount", "Adjusted Fuel Deposit"],
+}
+category_options = {
+    name: list(option_names)
+    for name, option_names in default_category_options.items()
 }
 additional_options = ["Timestamp"]
 
@@ -395,6 +643,8 @@ ncr_selected, npr_selected, loyalty_selected, lottery_selected = [], [], [], []
 category_frames = {}
 custom_categories = {}
 custom_options = {}
+hidden_categories = set()
+hidden_options = set()
 
 customization_path = os.path.join(
     os.environ.get("APPDATA", os.path.expanduser("~")),
@@ -409,13 +659,33 @@ try:
 
     saved_categories = saved_customizations.get("categories", {})
     saved_options = saved_customizations.get("options", {})
-    if not isinstance(saved_categories, dict) or not isinstance(saved_options, dict):
+    saved_removed_categories = saved_customizations.get("removed_categories", [])
+    saved_removed_options = saved_customizations.get("removed_options", [])
+    if (
+        not isinstance(saved_categories, dict)
+        or not isinstance(saved_options, dict)
+        or not isinstance(saved_removed_categories, list)
+        or any(not isinstance(name, str) or not name.strip() for name in saved_removed_categories)
+        or not isinstance(saved_removed_options, list)
+        or any(not isinstance(name, str) or not name.strip() for name in saved_removed_options)
+    ):
         raise ValueError("Customization categories and options must be JSON objects.")
 
-    used_category_names = {name.casefold() for name in category_options}
+    hidden_categories.update(saved_removed_categories)
+    hidden_options.update(saved_removed_options)
+    category_options = {
+        category_name: [
+            option_name
+            for option_name in option_names
+            if option_name not in hidden_options
+        ]
+        for category_name, option_names in default_category_options.items()
+        if category_name not in hidden_categories
+    }
+    used_category_names = {name.casefold() for name in default_category_options}
     used_option_names = {
         name.casefold()
-        for option_names in category_options.values()
+        for option_names in default_category_options.values()
         for name in option_names
     }
     used_option_names.add("timestamp")
@@ -462,9 +732,11 @@ except (OSError, json.JSONDecodeError, ValueError) as error:
     )
     custom_categories.clear()
     custom_options.clear()
+    hidden_categories.clear()
+    hidden_options.clear()
     category_options = {
-        "Crunchtime": category_options["Crunchtime"],
-        "CNG": category_options["CNG"],
+        name: list(option_names)
+        for name, option_names in default_category_options.items()
     }
 
 for option_names in category_options.values():
@@ -498,5 +770,7 @@ root.bind('<Delete>', lambda e: clear_all())
 root.bind('<Control-c>', copy_to_clipboard)
 root.bind_all("<KeyPress-plus>", show_add_choices)
 root.bind_all("<KP_Add>", show_add_choices)
+root.bind_all("<KeyPress-minus>", show_remove_choices)
+root.bind_all("<KP_Subtract>", show_remove_choices)
 tk.Label(root, text="Credited to Maal", font=("Arial", 7), fg="gray").pack(side="bottom", pady=2)
 root.mainloop()
