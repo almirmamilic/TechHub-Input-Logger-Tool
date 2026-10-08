@@ -215,7 +215,7 @@ def open_multi_checkbox_popup(name, options_list, selected_list):
 # ---------------------------
 
 root = tk.Tk()
-root.title("Data Entry Tool")
+root.title("Input Logger Tool")
 root.geometry("320x720") 
 try: root.iconbitmap(ICON_FILE)
 except: pass
