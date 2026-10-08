@@ -16,7 +16,7 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 ICON_FILE = resource_path("app_icon.ico")
-COLORS = {
+LIGHT_COLORS = {
     "background": "#F3F6FB",
     "surface": "#FFFFFF",
     "surface_alt": "#EAF0F8",
@@ -26,6 +26,18 @@ COLORS = {
     "accent_active": "#1D4ED8",
     "border": "#D8E1ED",
 }
+DARK_COLORS = {
+    "background": "#151A23",
+    "surface": "#202938",
+    "surface_alt": "#2B3749",
+    "text": "#E7EDF7",
+    "muted": "#A2B0C3",
+    "accent": "#82AFFF",
+    "accent_active": "#A0C0FF",
+    "border": "#3A485C",
+}
+COLORS = dict(LIGHT_COLORS)
+dark_mode_enabled = False
 
 # ---------------------------
 # State Management
@@ -211,6 +223,7 @@ def save_customizations(
                     }
                     if saved_option_order is None
                     else saved_option_order,
+                    "dark_mode": dark_mode_enabled,
                 },
                 config_file,
                 indent=2,
@@ -1172,116 +1185,175 @@ root.option_add("*Button.foreground", COLORS["text"])
 root.option_add("*Button.activeBackground", "#DCE7F5")
 root.option_add("*Button.activeForeground", COLORS["text"])
 root.option_add("*Button.borderWidth", 0)
+root.option_add("*Frame.background", COLORS["background"])
 root.option_add("*Checkbutton.background", COLORS["surface"])
 root.option_add("*Checkbutton.foreground", COLORS["text"])
 root.option_add("*Checkbutton.activeBackground", COLORS["surface"])
 root.option_add("*Checkbutton.activeForeground", COLORS["text"])
+root.option_add("*Entry.background", COLORS["surface"])
+root.option_add("*Entry.foreground", COLORS["text"])
+root.option_add("*Entry.insertBackground", COLORS["text"])
 root.option_add("*Entry.relief", "flat")
 
 style = ttk.Style(root)
 style.theme_use("clam")
-style.configure("TFrame", background=COLORS["background"])
-style.configure(
-    "TLabel",
-    background=COLORS["background"],
-    foreground=COLORS["text"],
-)
-style.configure(
-    "Header.TFrame",
-    background=COLORS["text"],
-)
-style.configure(
-    "HeaderTitle.TLabel",
-    background=COLORS["text"],
-    foreground=COLORS["surface"],
-    font=("Segoe UI", 17, "bold"),
-)
-style.configure(
-    "HeaderSubtitle.TLabel",
-    background=COLORS["text"],
-    foreground="#C8D5E7",
-    font=("Segoe UI", 9),
-)
-style.configure(
-    "TNotebook",
-    background=COLORS["background"],
-    borderwidth=0,
-    tabmargins=(0, 0, 0, 0),
-)
-style.configure(
-    "TNotebook.Tab",
-    background=COLORS["surface_alt"],
-    foreground=COLORS["muted"],
-    padding=(10, 5),
-    borderwidth=0,
-    font=("Segoe UI", 9, "bold"),
-)
-style.map(
-    "TNotebook.Tab",
-    background=[("selected", COLORS["surface"])],
-    foreground=[("selected", COLORS["accent"])],
-    padding=[("selected", (10, 5)), ("!selected", (10, 5))],
-    borderwidth=[("selected", 0), ("!selected", 0)],
-)
-style.configure(
-    "TCheckbutton",
-    background=COLORS["surface"],
-    foreground=COLORS["text"],
-    padding=(4, 3),
-)
-style.map(
-    "TCheckbutton",
-    foreground=[("active", COLORS["accent"])],
-    background=[("active", COLORS["surface"])],
-)
-style.configure(
-    "TLabelframe",
-    background=COLORS["surface"],
-    bordercolor=COLORS["border"],
-    relief="solid",
-)
-style.configure(
-    "TLabelframe.Label",
-    background=COLORS["surface"],
-    foreground=COLORS["muted"],
-    font=("Segoe UI", 9, "bold"),
-)
-style.configure(
-    "TButton",
-    background=COLORS["surface_alt"],
-    foreground=COLORS["text"],
-    padding=(14, 8),
-    borderwidth=0,
-    font=("Segoe UI", 9, "bold"),
-)
-style.map(
-    "TButton",
-    background=[("active", "#DCE7F5"), ("pressed", "#CFDDF0")],
-    foreground=[("active", COLORS["text"])],
-)
-style.configure(
-    "Accent.TButton",
-    background=COLORS["accent"],
-    foreground=COLORS["surface"],
-)
-style.map(
-    "Accent.TButton",
-    background=[("active", COLORS["accent_active"]), ("pressed", COLORS["accent_active"])],
-    foreground=[("active", COLORS["surface"])],
-)
-style.configure(
-    "TCombobox",
-    fieldbackground=COLORS["surface"],
-    background=COLORS["surface"],
-    foreground=COLORS["text"],
-    padding=5,
-)
-style.configure(
-    "TEntry",
-    fieldbackground=COLORS["surface"],
-    foreground=COLORS["text"],
-    padding=5,
-)
+
+
+def apply_theme_styles():
+    root.configure(background=COLORS["background"])
+    root.option_add("*Label.background", COLORS["background"])
+    root.option_add("*Label.foreground", COLORS["text"])
+    root.option_add("*Button.background", COLORS["surface_alt"])
+    root.option_add("*Button.foreground", COLORS["text"])
+    root.option_add("*Button.activeBackground", COLORS["surface"])
+    root.option_add("*Button.activeForeground", COLORS["text"])
+    root.option_add("*Frame.background", COLORS["background"])
+    root.option_add("*Checkbutton.background", COLORS["surface"])
+    root.option_add("*Checkbutton.foreground", COLORS["text"])
+    root.option_add("*Checkbutton.activeBackground", COLORS["surface"])
+    root.option_add("*Checkbutton.activeForeground", COLORS["text"])
+    root.option_add("*Entry.background", COLORS["surface"])
+    root.option_add("*Entry.foreground", COLORS["text"])
+    root.option_add("*Entry.insertBackground", COLORS["text"])
+
+    style.configure("TFrame", background=COLORS["background"])
+    style.configure("TLabel", background=COLORS["background"], foreground=COLORS["text"])
+    style.configure("Header.TFrame", background=COLORS["text"])
+    style.configure(
+        "HeaderTitle.TLabel",
+        background=COLORS["text"],
+        foreground=COLORS["surface"],
+        font=("Segoe UI", 17, "bold"),
+    )
+    style.configure(
+        "HeaderSubtitle.TLabel",
+        background=COLORS["text"],
+        foreground=COLORS["muted"],
+        font=("Segoe UI", 9),
+    )
+    style.configure(
+        "TNotebook",
+        background=COLORS["background"],
+        borderwidth=0,
+        tabmargins=(0, 0, 0, 0),
+    )
+    style.configure(
+        "TNotebook.Tab",
+        background=COLORS["surface_alt"],
+        foreground=COLORS["muted"],
+        padding=(10, 5),
+        borderwidth=0,
+        font=("Segoe UI", 9, "bold"),
+    )
+    style.map(
+        "TNotebook.Tab",
+        background=[("selected", COLORS["surface"])],
+        foreground=[("selected", COLORS["accent"])],
+        padding=[("selected", (10, 5)), ("!selected", (10, 5))],
+        borderwidth=[("selected", 0), ("!selected", 0)],
+    )
+    style.configure(
+        "TCheckbutton",
+        background=COLORS["surface"],
+        foreground=COLORS["text"],
+        padding=(4, 3),
+    )
+    style.map(
+        "TCheckbutton",
+        foreground=[("active", COLORS["accent"])],
+        background=[("active", COLORS["surface"])],
+    )
+    style.configure(
+        "TLabelframe",
+        background=COLORS["surface"],
+        bordercolor=COLORS["border"],
+        relief="solid",
+    )
+    style.configure(
+        "TLabelframe.Label",
+        background=COLORS["surface"],
+        foreground=COLORS["muted"],
+        font=("Segoe UI", 9, "bold"),
+    )
+    style.configure(
+        "TButton",
+        background=COLORS["surface_alt"],
+        foreground=COLORS["text"],
+        padding=(14, 8),
+        borderwidth=0,
+        font=("Segoe UI", 9, "bold"),
+    )
+    style.map(
+        "TButton",
+        background=[
+            ("active", COLORS["surface"]),
+            ("pressed", COLORS["border"]),
+        ],
+        foreground=[("active", COLORS["text"])],
+    )
+    style.configure(
+        "Accent.TButton",
+        background=COLORS["accent"],
+        foreground="#FFFFFF",
+    )
+    style.map(
+        "Accent.TButton",
+        background=[
+            ("active", COLORS["accent_active"]),
+            ("pressed", COLORS["accent_active"]),
+        ],
+        foreground=[("active", "#FFFFFF")],
+    )
+    style.configure(
+        "TCombobox",
+        fieldbackground=COLORS["surface"],
+        background=COLORS["surface"],
+        foreground=COLORS["text"],
+        padding=5,
+    )
+    style.map(
+        "TCombobox",
+        fieldbackground=[("readonly", COLORS["surface"])],
+        foreground=[("readonly", COLORS["text"])],
+    )
+    style.configure(
+        "TEntry",
+        fieldbackground=COLORS["surface"],
+        foreground=COLORS["text"],
+        padding=5,
+    )
+
+
+apply_theme_styles()
+
+
+def apply_theme():
+    COLORS.clear()
+    COLORS.update(DARK_COLORS if dark_mode_enabled else LIGHT_COLORS)
+    apply_theme_styles()
+    for frame in category_frames.values():
+        frame.configure(background=COLORS["surface"])
+    if "result_frame" in globals():
+        result_frame.configure(background=COLORS["background"])
+        btn_frame.configure(background=COLORS["background"])
+    if "result" in globals():
+        result.configure(
+            bg=COLORS["surface"],
+            fg=COLORS["text"],
+            insertbackground=COLORS["text"],
+            highlightbackground=COLORS["border"],
+            highlightcolor=COLORS["accent"],
+        )
+
+
+def toggle_dark_mode():
+    global dark_mode_enabled
+    dark_mode_enabled = dark_mode_var.get()
+    apply_theme()
+    if not save_customizations(custom_categories, custom_options):
+        dark_mode_enabled = not dark_mode_enabled
+        dark_mode_var.set(dark_mode_enabled)
+        apply_theme()
 
 options_notebook = ttk.Notebook(root, height=0)
 options_notebook.pack(fill="both", expand=True, padx=16, pady=(8, 8))
@@ -1303,6 +1375,7 @@ category_options = {
 additional_options = ["Timestamp"]
 
 all_options = {}
+dark_mode_var = tk.BooleanVar(value=dark_mode_enabled)
 bol1_value, bol2_value, bol3_value = tk.StringVar(), tk.StringVar(), tk.StringVar()
 ncr_selected, npr_selected, loyalty_selected, lottery_selected = [], [], [], []
 category_frames = {}
@@ -1333,9 +1406,11 @@ try:
     saved_option_labels = saved_customizations.get("option_labels", {})
     saved_category_order = saved_customizations.get("category_order")
     saved_option_order = saved_customizations.get("option_order")
+    saved_dark_mode = saved_customizations.get("dark_mode", False)
     if (
         not isinstance(saved_categories, dict)
         or not isinstance(saved_options, dict)
+        or not isinstance(saved_dark_mode, bool)
         or not isinstance(saved_category_labels, dict)
         or any(
             not isinstance(old, str)
@@ -1471,6 +1546,7 @@ try:
             ):
                 raise ValueError("Customization file contains an invalid option order.")
             category_options[category_name] = list(saved_order)
+    dark_mode_enabled = saved_dark_mode
 except FileNotFoundError:
     pass
 except (OSError, json.JSONDecodeError, ValueError) as error:
@@ -1491,11 +1567,15 @@ except (OSError, json.JSONDecodeError, ValueError) as error:
         name: list(option_names)
         for name, option_names in default_category_options.items()
     }
+    dark_mode_enabled = False
     category_action_names.update(
         {name: name for name in default_category_options}
     )
     for option_names in default_category_options.values():
         option_action_names.update({name: name for name in option_names})
+
+dark_mode_var.set(dark_mode_enabled)
+apply_theme()
 
 for option_names in category_options.values():
     for name in option_names:
@@ -1512,7 +1592,13 @@ for name in additional_options:
         text=name,
         variable=all_options[name],
         command=lambda n=name: on_checkbox_toggle(n),
-    ).pack(anchor="w")
+    ).pack(side="left")
+ttk.Checkbutton(
+    timestamp_frame,
+    text="Dark Mode",
+    variable=dark_mode_var,
+    command=toggle_dark_mode,
+).pack(side="left", padx=(16, 0))
 
 result_frame = tk.Frame(root, background=COLORS["background"])
 result_frame.pack(fill="x", padx=16, pady=(8, 12))
@@ -1534,12 +1620,6 @@ result = tk.Text(
     pady=9,
 )
 result.pack(fill="x", pady=(0, 10))
-ttk.Label(
-    result_frame,
-    text="Credited to Maal",
-    font=("Segoe UI", 8),
-    foreground=COLORS["muted"],
-).pack(anchor="center", pady=(0, 6))
 btn_frame = tk.Frame(result_frame, background=COLORS["background"])
 btn_frame.pack(anchor="center")
 ttk.Button(
@@ -1555,6 +1635,12 @@ ttk.Button(
     width=12,
     command=clear_all,
 ).pack(side="left", padx=(8, 0))
+ttk.Label(
+    result_frame,
+    text="Credited to Maal",
+    font=("Segoe UI", 8),
+    foreground=COLORS["muted"],
+).pack(anchor="center", pady=(6, 0))
 
 def refresh_timestamp():
     if all_options["Timestamp"].get(): update_result()
