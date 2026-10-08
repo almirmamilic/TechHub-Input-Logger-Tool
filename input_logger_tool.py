@@ -1,6 +1,7 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import messagebox, simpledialog, ttk
 from datetime import datetime
+import json
 import sys
 import os
 
@@ -135,6 +136,169 @@ def clear_all():
     update_result()
     root.focus_set()
 
+
+def activate_popup(window, initial_focus=None):
+    window.iconbitmap(ICON_FILE)
+    root.update_idletasks()
+    window.update_idletasks()
+    x = root.winfo_rootx() + (root.winfo_width() - window.winfo_width()) // 2
+    y = root.winfo_rooty() + (root.winfo_height() - window.winfo_height()) // 2
+    window.geometry(f"+{x}+{y}")
+    window.lift()
+    window.grab_set()
+    window.focus_force()
+    if initial_focus is not None:
+        initial_focus.focus_force()
+
+
+def save_customizations(categories, options):
+    config_dir = os.path.join(
+        os.environ.get("APPDATA", os.path.expanduser("~")),
+        "TechHub Input Logger Tool",
+    )
+    config_path = os.path.join(config_dir, "customizations.json")
+    try:
+        os.makedirs(config_dir, exist_ok=True)
+        with open(config_path, "w", encoding="utf-8") as config_file:
+            json.dump(
+                {"categories": categories, "options": options},
+                config_file,
+                indent=2,
+            )
+    except OSError as error:
+        messagebox.showerror("Save Failed", f"Could not save changes:\n{error}", parent=root)
+        return False
+    return True
+
+
+def add_option_checkbox(category_name, option_name):
+    if option_name not in all_options:
+        all_options[option_name] = tk.BooleanVar()
+    tk.Checkbutton(
+        category_frames[category_name],
+        text=option_name,
+        variable=all_options[option_name],
+        command=lambda n=option_name: on_checkbox_toggle(n),
+    ).pack(anchor="w")
+
+
+def add_category_tab(category_name):
+    frame = tk.Frame(options_notebook, padx=5, pady=5)
+    category_frames[category_name] = frame
+    options_notebook.add(frame, text=category_name)
+    for option_name in category_options[category_name]:
+        add_option_checkbox(category_name, option_name)
+    return frame
+
+
+def add_new_category():
+    category_name = simpledialog.askstring(
+        "Add New Category",
+        "Enter a name for the new category:",
+        parent=root,
+    )
+    if category_name is None:
+        return
+
+    category_name = category_name.strip()
+    if not category_name:
+        messagebox.showwarning("Invalid Category", "Category name cannot be empty.", parent=root)
+        return
+    if any(name.casefold() == category_name.casefold() for name in category_frames):
+        messagebox.showwarning("Duplicate Category", "That category already exists.", parent=root)
+        return
+
+    new_categories = {**custom_categories, category_name: []}
+    if not save_customizations(new_categories, custom_options):
+        return
+
+    custom_categories[category_name] = []
+    category_options[category_name] = []
+    options_notebook.select(add_category_tab(category_name))
+
+
+def add_new_option():
+    dialog = tk.Toplevel(root)
+    dialog.title("Add New Option")
+    dialog.geometry("300x150")
+    dialog.transient(root)
+
+    tk.Label(dialog, text="Option name:").pack(anchor="w", padx=10, pady=(10, 2))
+    name_entry = tk.Entry(dialog)
+    name_entry.pack(fill="x", padx=10)
+    tk.Label(dialog, text="Category:").pack(anchor="w", padx=10, pady=(8, 2))
+    category_choice = ttk.Combobox(
+        dialog,
+        values=list(category_frames),
+        state="readonly",
+    )
+    category_choice.pack(fill="x", padx=10)
+    category_choice.current(0)
+
+    def confirm(event=None):
+        option_name = name_entry.get().strip()
+        category_name = category_choice.get()
+        if not option_name:
+            messagebox.showwarning("Invalid Option", "Option name cannot be empty.", parent=dialog)
+            name_entry.focus_set()
+            return
+        if any(name.casefold() == option_name.casefold() for name in all_options):
+            messagebox.showwarning("Duplicate Option", "That option already exists.", parent=dialog)
+            name_entry.focus_set()
+            return
+
+        new_custom_options = {
+            name: list(option_names)
+            for name, option_names in custom_options.items()
+        }
+        new_custom_options.setdefault(category_name, []).append(option_name)
+        if not save_customizations(custom_categories, new_custom_options):
+            return
+
+        custom_options[category_name] = new_custom_options[category_name]
+        category_options[category_name].append(option_name)
+        add_option_checkbox(category_name, option_name)
+        dialog.destroy()
+
+    buttons = tk.Frame(dialog)
+    buttons.pack(pady=10)
+    tk.Button(buttons, text="Add", width=10, command=confirm).pack(side="left", padx=5)
+    tk.Button(buttons, text="Cancel", width=10, command=dialog.destroy).pack(side="left", padx=5)
+    dialog.bind("<Return>", confirm)
+    dialog.bind("<Escape>", lambda event: dialog.destroy())
+    activate_popup(dialog, name_entry)
+
+
+def show_add_choices(event=None):
+    if event is not None and event.widget.winfo_toplevel() is not root:
+        return
+
+    popup = tk.Toplevel(root)
+    popup.title("Input Logger Tool")
+    popup.geometry("280x90")
+    popup.transient(root)
+
+    def choose(action):
+        popup.destroy()
+        action()
+
+    buttons = tk.Frame(popup)
+    buttons.pack(expand=True)
+    add_category_button = tk.Button(
+        buttons,
+        text="Add New Category",
+        command=lambda: choose(add_new_category),
+    )
+    add_category_button.pack(side="left", padx=5)
+    tk.Button(
+        buttons,
+        text="Add New Option",
+        command=lambda: choose(add_new_option),
+    ).pack(side="left", padx=5)
+    popup.bind("<Escape>", lambda key_event: popup.destroy())
+    activate_popup(popup, add_category_button)
+
+
 # ---------------------------
 # Popups Logic
 # ---------------------------
@@ -143,15 +307,10 @@ def open_bol_popup(bol_name, bol_var):
     popup = tk.Toplevel(root)
     popup.title(f"Enter {bol_name}")
     popup.geometry("250x120")
-    try: popup.iconbitmap(ICON_FILE)
-    except: pass
     popup.transient(root)
-    popup.grab_set()
     tk.Label(popup, text=f"Enter {bol_name} value:").pack(pady=5)
     entry = tk.Entry(popup, textvariable=bol_var)
     entry.pack(pady=5)
-    entry.focus_force()
-
     def confirm(event=None):
         popup.destroy()
         update_result()
@@ -166,15 +325,13 @@ def open_bol_popup(bol_name, bol_var):
     tk.Button(popup, text="Confirm", command=confirm).pack(pady=5)
     popup.bind('<Return>', confirm)
     popup.bind('<Escape>', cancel_esc)
+    activate_popup(popup, entry)
 
 def open_multi_checkbox_popup(name, options_list, selected_list):
     popup = tk.Toplevel(root)
     popup.title(f"Select {name}")
     popup.geometry("250x240")
-    try: popup.iconbitmap(ICON_FILE)
-    except: pass
     popup.transient(root)
-    popup.grab_set()
     vars, widgets = [], []
     for opt in options_list:
         var = tk.BooleanVar(value=(opt in selected_list))
@@ -207,9 +364,9 @@ def open_multi_checkbox_popup(name, options_list, selected_list):
     btn = tk.Button(popup, text="Confirm", command=confirm)
     btn.pack(pady=10)
     btn.bind("<Up>", focus_prev)
-    if widgets: widgets[0].focus_force()
     popup.bind('<Return>', confirm)
     popup.bind('<Escape>', cancel_esc)
+    activate_popup(popup, widgets[0] if widgets else btn)
 
 # ---------------------------
 # UI Construction
@@ -218,36 +375,106 @@ def open_multi_checkbox_popup(name, options_list, selected_list):
 root = tk.Tk()
 root.title("Input Logger Tool")
 root.geometry("320x720") 
-try: root.iconbitmap(ICON_FILE)
-except: pass
+root.iconbitmap(ICON_FILE)
+root.iconbitmap(default=ICON_FILE)
 
 options_notebook = ttk.Notebook(root)
-zenput_frame = tk.Frame(options_notebook, padx=5, pady=5)
-cng_frame = tk.Frame(options_notebook, padx=5, pady=5)
 timestamp_frame = tk.LabelFrame(root, text="Additional Options", padx=5, pady=5)
-options_notebook.add(zenput_frame, text="Crunchtime")
-options_notebook.add(cng_frame, text="CNG")
 options_notebook.pack(fill="both", padx=10, pady=5)
 timestamp_frame.pack(fill="both", padx=10, pady=5)
 
-zenput_options = ["Bill Of Lading [1]", "Bill Of Lading [2]", "Bill Of Lading [3]", "Veeder Root", "Payout", "Coupon", "Lottery", "Titan Series", "Change Order"]
-cng_options = ["EMR", "NCR", "NPR", "Loyalty", "Drive Off", "Pop Discount", "Adjusted Fuel Deposit"]
+category_options = {
+    "Crunchtime": ["Bill Of Lading [1]", "Bill Of Lading [2]", "Bill Of Lading [3]", "Veeder Root", "Payout", "Coupon", "Lottery", "Titan Series", "Change Order"],
+    "CNG": ["EMR", "NCR", "NPR", "Loyalty", "Drive Off", "Pop Discount", "Adjusted Fuel Deposit"],
+}
 additional_options = ["Timestamp"]
 
 all_options = {}
 bol1_value, bol2_value, bol3_value = tk.StringVar(), tk.StringVar(), tk.StringVar()
 ncr_selected, npr_selected, loyalty_selected, lottery_selected = [], [], [], []
+category_frames = {}
+custom_categories = {}
+custom_options = {}
 
-for name in zenput_options + cng_options + additional_options:
+customization_path = os.path.join(
+    os.environ.get("APPDATA", os.path.expanduser("~")),
+    "TechHub Input Logger Tool",
+    "customizations.json",
+)
+try:
+    with open(customization_path, "r", encoding="utf-8") as config_file:
+        saved_customizations = json.load(config_file)
+    if not isinstance(saved_customizations, dict):
+        raise ValueError("Customization file must contain a JSON object.")
+
+    saved_categories = saved_customizations.get("categories", {})
+    saved_options = saved_customizations.get("options", {})
+    if not isinstance(saved_categories, dict) or not isinstance(saved_options, dict):
+        raise ValueError("Customization categories and options must be JSON objects.")
+
+    used_category_names = {name.casefold() for name in category_options}
+    used_option_names = {
+        name.casefold()
+        for option_names in category_options.values()
+        for name in option_names
+    }
+    used_option_names.add("timestamp")
+    for category_name, option_names in saved_categories.items():
+        if (
+            not isinstance(category_name, str)
+            or not category_name.strip()
+            or category_name.casefold() in used_category_names
+            or not isinstance(option_names, list)
+            or any(
+                not isinstance(option_name, str)
+                or not option_name.strip()
+                or option_name.casefold() in used_option_names
+                for option_name in option_names
+            )
+        ):
+            raise ValueError("Customization file contains an invalid or duplicate category.")
+        custom_categories[category_name] = option_names
+        category_options[category_name] = list(option_names)
+        used_category_names.add(category_name.casefold())
+        used_option_names.update(option_name.casefold() for option_name in option_names)
+    for category_name, option_names in saved_options.items():
+        if (
+            category_name not in category_options
+            or not isinstance(option_names, list)
+            or any(
+                not isinstance(option_name, str)
+                or not option_name.strip()
+                or option_name.casefold() in used_option_names
+                for option_name in option_names
+            )
+        ):
+            raise ValueError("Customization file contains an invalid or duplicate option.")
+        custom_options[category_name] = list(option_names)
+        category_options[category_name].extend(option_names)
+        used_option_names.update(option_name.casefold() for option_name in option_names)
+except FileNotFoundError:
+    pass
+except (OSError, json.JSONDecodeError, ValueError) as error:
+    messagebox.showerror(
+        "Customization Load Failed",
+        f"Could not load saved categories and options:\n{error}",
+        parent=root,
+    )
+    custom_categories.clear()
+    custom_options.clear()
+    category_options = {
+        "Crunchtime": category_options["Crunchtime"],
+        "CNG": category_options["CNG"],
+    }
+
+for option_names in category_options.values():
+    for name in option_names:
+        all_options[name] = tk.BooleanVar()
+for name in additional_options:
     all_options[name] = tk.BooleanVar()
 
-for name in zenput_options:
-    tk.Checkbutton(zenput_frame, text=name, variable=all_options[name], 
-                   command=lambda n=name: on_checkbox_toggle(n)).pack(anchor="w")
-
-for name in cng_options:
-    tk.Checkbutton(cng_frame, text=name, variable=all_options[name], 
-                   command=lambda n=name: on_checkbox_toggle(n)).pack(anchor="w")
+for category_name in category_options:
+    add_category_tab(category_name)
 
 for name in additional_options:
     tk.Checkbutton(timestamp_frame, text=name, variable=all_options[name], 
@@ -269,5 +496,7 @@ def refresh_timestamp():
 refresh_timestamp()
 root.bind('<Delete>', lambda e: clear_all())
 root.bind('<Control-c>', copy_to_clipboard)
+root.bind_all("<KeyPress-plus>", show_add_choices)
+root.bind_all("<KP_Add>", show_add_choices)
 tk.Label(root, text="Credited to Maal", font=("Arial", 7), fg="gray").pack(side="bottom", pady=2)
 root.mainloop()
