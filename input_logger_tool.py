@@ -13,7 +13,7 @@ def resource_path(relative_path):
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
 
-ICON_FILE = resource_path("icon.ico")
+ICON_FILE = resource_path("app_icon.ico")
 
 # ---------------------------
 # State Management
