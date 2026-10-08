@@ -1048,6 +1048,24 @@ def toggle_timestamp(event=None):
     return "break"
 
 
+def navigate_tabs(event):
+    if event.widget.winfo_toplevel() is not root:
+        return
+    if event.widget.winfo_class() in ("Entry", "Text", "TEntry", "TCombobox"):
+        return
+
+    tabs = options_notebook.tabs()
+    if not tabs:
+        return "break"
+
+    current_index = options_notebook.index(options_notebook.select())
+    if event.keysym.lower() in ("a", "left"):
+        options_notebook.select(tabs[max(0, current_index - 1)])
+    elif event.keysym.lower() in ("d", "right"):
+        options_notebook.select(tabs[min(len(tabs) - 1, current_index + 1)])
+    return "break"
+
+
 # ---------------------------
 # Popups Logic
 # ---------------------------
@@ -1373,5 +1391,11 @@ root.bind_all("<KP_Subtract>", show_remove_choices)
 root.bind_all("<KeyPress-asterisk>", show_organize_choices)
 root.bind_all("<KP_Multiply>", show_organize_choices)
 root.bind_all("<KeyPress-grave>", toggle_timestamp)
+root.bind_all("<KeyPress-a>", navigate_tabs)
+root.bind_all("<KeyPress-A>", navigate_tabs)
+root.bind_all("<KeyPress-d>", navigate_tabs)
+root.bind_all("<KeyPress-D>", navigate_tabs)
+root.bind_all("<Left>", navigate_tabs)
+root.bind_all("<Right>", navigate_tabs)
 tk.Label(root, text="Credited to Maal", font=("Arial", 7), fg="gray").pack(side="bottom", pady=2)
 root.mainloop()
