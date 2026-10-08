@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import ttk
 from datetime import datetime
 import sys
 import os
@@ -220,11 +221,13 @@ root.geometry("320x720")
 try: root.iconbitmap(ICON_FILE)
 except: pass
 
-zenput_frame = tk.LabelFrame(root, text="Zenput Options", padx=5, pady=5)
-cng_frame = tk.LabelFrame(root, text="CNG Options", padx=5, pady=5)
+options_notebook = ttk.Notebook(root)
+zenput_frame = tk.Frame(options_notebook, padx=5, pady=5)
+cng_frame = tk.Frame(options_notebook, padx=5, pady=5)
 timestamp_frame = tk.LabelFrame(root, text="Additional Options", padx=5, pady=5)
-zenput_frame.pack(fill="both", padx=10, pady=5)
-cng_frame.pack(fill="both", padx=10, pady=5)
+options_notebook.add(zenput_frame, text="Zenput Options")
+options_notebook.add(cng_frame, text="CNG Options")
+options_notebook.pack(fill="both", padx=10, pady=5)
 timestamp_frame.pack(fill="both", padx=10, pady=5)
 
 zenput_options = ["Bill Of Lading [1]", "Bill Of Lading [2]", "Bill Of Lading [3]", "Veeder Root", "Payout", "Coupon", "Lottery", "Titan Series", "Change Order"]
