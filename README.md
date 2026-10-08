@@ -11,7 +11,15 @@ A desktop application for organizing and copying inputs from store paperwork sub
 - Toggle **Timestamp** and switch between light and dark themes.
 - Save custom categories, options, labels, ordering, and theme preference between launches.
 
-When adding a multiple-choice option, enter one choice per line. Selected choices are included in the copied entry as `Option(choice 1, choice 2)`. Text-entry options are included as `Option#value`.
+### Custom option types
+
+When adding an option, choose one of these types:
+
+- **Standard** — adds the option name when selected.
+- **Text Entry** — prompts for a value and adds it as `Option#value`.
+- **Multiple Choices** — enter one choice per line. The popup lets you select multiple choices, which are added as `Option(choice 1, choice 2)`.
+
+In a multiple-choice popup, use **Up** and **Down** to move between choices, **Space** to toggle the focused choice, **Left Arrow** to select it, and **Right Arrow** to clear it.
 
 ## Keyboard shortcuts
 
@@ -21,7 +29,7 @@ When adding a multiple-choice option, enter one choice per line. Selected choice
 | `-` | Choose a category or option to remove |
 | `*` | Choose categories or options to rename or reorder |
 | `` ` `` | Toggle Timestamp |
-| `A` or `←` | Go to the previous tab |
-| `D` or `→` | Go to the next tab |
+| `A` or `←` | Go to the previous tab (when a choice popup is not active) |
+| `D` or `→` | Go to the next tab (when a choice popup is not active) |
 
 Use the **Dark Mode** checkbox in **Additional Options** to change the theme. Your theme preference and category and option customizations are saved for the current Windows user.
