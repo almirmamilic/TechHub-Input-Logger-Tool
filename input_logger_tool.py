@@ -21,6 +21,8 @@ ICON_FILE = resource_path("app_icon.ico")
 # State Management
 # ---------------------------
 click_order = []
+option_action_names = {}
+category_action_names = {}
 
 # ---------------------------
 # Functions
@@ -28,6 +30,7 @@ click_order = []
 
 def on_checkbox_toggle(name):
     """Tracks the order of clicks and opens popups"""
+    action_name = option_action_names.get(name, name)
     if all_options[name].get():
         if name not in click_order:
             click_order.append(name)
@@ -35,30 +38,30 @@ def on_checkbox_toggle(name):
         if name in click_order:
             click_order.remove(name)
     
-    if name == "Bill Of Lading [1]":
+    if action_name == "Bill Of Lading [1]":
         if all_options[name].get(): open_bol_popup(name, bol1_value)
-    elif name == "Bill Of Lading [2]":
+    elif action_name == "Bill Of Lading [2]":
         if all_options[name].get(): open_bol_popup(name, bol2_value)
-    elif name == "Bill Of Lading [3]":
+    elif action_name == "Bill Of Lading [3]":
         if all_options[name].get(): open_bol_popup(name, bol3_value)
-    elif name == "NCR":
+    elif action_name == "NCR":
         if all_options[name].get():
-            open_multi_checkbox_popup("NCR", ["Fleetwide", "Fuelman", "PumpPass", "ExxonMobilG", "Shell"], ncr_selected)
+            open_multi_checkbox_popup(name, ["Fleetwide", "Fuelman", "PumpPass", "ExxonMobilG", "Shell"], ncr_selected)
         else:
             ncr_selected.clear()
-    elif name == "NPR":
+    elif action_name == "NPR":
         if all_options[name].get():
-            open_multi_checkbox_popup("NPR", ["E-85", "Diesel", "Racingfuel", "Kerosene"], npr_selected)
+            open_multi_checkbox_popup(name, ["E-85", "Diesel", "Racingfuel", "Kerosene"], npr_selected)
         else:
             npr_selected.clear()
-    elif name == "Loyalty":
+    elif action_name == "Loyalty":
         if all_options[name].get():
-            open_multi_checkbox_popup("Loyalty", ["600", "888", "800", "211"], loyalty_selected)
+            open_multi_checkbox_popup(name, ["600", "888", "800", "211"], loyalty_selected)
         else:
             loyalty_selected.clear()
-    elif name == "Lottery":
+    elif action_name == "Lottery":
         if all_options[name].get():
-            open_multi_checkbox_popup("Lottery", ["FL Lottery", "IN Lottery", "IL Lottery"], lottery_selected)
+            open_multi_checkbox_popup(name, ["FL Lottery", "IN Lottery", "IL Lottery"], lottery_selected)
         else:
             lottery_selected.clear()
             
@@ -75,36 +78,37 @@ def update_result():
             continue
             
         # Reverted Logic for NCR, NPR, Loyalty
-        if name == "NCR":
+        action_name = option_action_names.get(name, name)
+        if action_name == "NCR":
             if ncr_selected:
-                selected.append(f"NCR({', '.join(ncr_selected)})")
+                selected.append(f"{name}({', '.join(ncr_selected)})")
             else:
                 selected.append(name)
-        elif name == "NPR":
+        elif action_name == "NPR":
             if npr_selected:
-                selected.append(f"NPR({', '.join(npr_selected)})")
+                selected.append(f"{name}({', '.join(npr_selected)})")
             else:
                 selected.append(name)
-        elif name == "Loyalty":
+        elif action_name == "Loyalty":
             if loyalty_selected:
-                selected.append(f"Loyalty({', '.join(loyalty_selected)})")
+                selected.append(f"{name}({', '.join(loyalty_selected)})")
             else:
                 selected.append(name)
         
         # Keeping Lottery as sub-selections only (per previous request)
-        elif name == "Lottery":
+        elif action_name == "Lottery":
             if lottery_selected:
                 selected.append(", ".join(lottery_selected))
             else:
                 selected.append(name)
         
-        elif name == "Bill Of Lading [1]":
+        elif action_name == "Bill Of Lading [1]":
             val = bol1_value.get().strip()
             selected.append(f"BOL#{val}" if val else "BOL1#")
-        elif name == "Bill Of Lading [2]":
+        elif action_name == "Bill Of Lading [2]":
             val = bol2_value.get().strip()
             selected.append(f"BOL#{val}" if val else "BOL2#")
-        elif name == "Bill Of Lading [3]":
+        elif action_name == "Bill Of Lading [3]":
             val = bol3_value.get().strip()
             selected.append(f"BOL#{val}" if val else "BOL3#")
         else:
@@ -151,7 +155,16 @@ def activate_popup(window, initial_focus=None):
         initial_focus.focus_force()
 
 
-def save_customizations(categories, options, removed_category_names=None, removed_option_names=None):
+def save_customizations(
+    categories,
+    options,
+    removed_category_names=None,
+    removed_option_names=None,
+    saved_category_labels=None,
+    saved_option_labels=None,
+    saved_category_order=None,
+    saved_option_order=None,
+):
     config_dir = os.path.join(
         os.environ.get("APPDATA", os.path.expanduser("~")),
         "TechHub Input Logger Tool",
@@ -170,6 +183,23 @@ def save_customizations(categories, options, removed_category_names=None, remove
                     "removed_options": sorted(
                         hidden_options if removed_option_names is None else removed_option_names
                     ),
+                    "category_labels": (
+                        category_labels if saved_category_labels is None else saved_category_labels
+                    ),
+                    "option_labels": (
+                        option_labels if saved_option_labels is None else saved_option_labels
+                    ),
+                    "category_order": (
+                        list(category_options)
+                        if saved_category_order is None
+                        else saved_category_order
+                    ),
+                    "option_order": {
+                        name: list(option_names)
+                        for name, option_names in category_options.items()
+                    }
+                    if saved_option_order is None
+                    else saved_option_order,
                 },
                 config_file,
                 indent=2,
@@ -183,12 +213,14 @@ def save_customizations(categories, options, removed_category_names=None, remove
 def add_option_checkbox(category_name, option_name):
     if option_name not in all_options:
         all_options[option_name] = tk.BooleanVar()
-    tk.Checkbutton(
+    checkbox = tk.Checkbutton(
         category_frames[category_name],
         text=option_name,
         variable=all_options[option_name],
         command=lambda n=option_name: on_checkbox_toggle(n),
-    ).pack(anchor="w")
+    )
+    checkbox.pack(anchor="w")
+    option_widgets[option_name] = checkbox
 
 
 def add_category_tab(category_name):
@@ -213,7 +245,11 @@ def add_new_category():
     if not category_name:
         messagebox.showwarning("Invalid Category", "Category name cannot be empty.", parent=root)
         return
-    if any(name.casefold() == category_name.casefold() for name in default_category_options):
+    reserved_categories = {
+        name.casefold()
+        for name in (*default_category_options, *category_labels.values())
+    }
+    if category_name.casefold() in reserved_categories:
         messagebox.showwarning("Duplicate Category", "That category name is reserved.", parent=root)
         return
     if any(name.casefold() == category_name.casefold() for name in category_frames):
@@ -221,11 +257,23 @@ def add_new_category():
         return
 
     new_categories = {**custom_categories, category_name: []}
-    if not save_customizations(new_categories, custom_options):
+    new_category_order = [*category_options, category_name]
+    new_option_order = {
+        name: list(option_names)
+        for name, option_names in category_options.items()
+    }
+    new_option_order[category_name] = []
+    if not save_customizations(
+        new_categories,
+        custom_options,
+        saved_category_order=new_category_order,
+        saved_option_order=new_option_order,
+    ):
         return
 
     custom_categories[category_name] = []
     category_options[category_name] = []
+    category_action_names[category_name] = category_name
     options_notebook.select(add_category_tab(category_name))
 
 
@@ -281,11 +329,21 @@ def add_new_option():
             for name, option_names in custom_options.items()
         }
         new_custom_options.setdefault(category_name, []).append(option_name)
-        if not save_customizations(custom_categories, new_custom_options):
+        new_option_order = {
+            name: list(option_names)
+            for name, option_names in category_options.items()
+        }
+        new_option_order[category_name].append(option_name)
+        if not save_customizations(
+            custom_categories,
+            new_custom_options,
+            saved_option_order=new_option_order,
+        ):
             return
 
         custom_options[category_name] = new_custom_options[category_name]
         category_options[category_name].append(option_name)
+        option_action_names[option_name] = option_name
         add_option_checkbox(category_name, option_name)
         dialog.destroy()
 
@@ -329,22 +387,24 @@ def show_add_choices(event=None):
 
 
 def remove_option_state(option_name):
+    action_name = option_action_names.pop(option_name, option_name)
+    option_widgets.pop(option_name, None)
     all_options.pop(option_name, None)
     if option_name in click_order:
         click_order.remove(option_name)
-    if option_name == "NCR":
+    if action_name == "NCR":
         ncr_selected.clear()
-    elif option_name == "NPR":
+    elif action_name == "NPR":
         npr_selected.clear()
-    elif option_name == "Loyalty":
+    elif action_name == "Loyalty":
         loyalty_selected.clear()
-    elif option_name == "Lottery":
+    elif action_name == "Lottery":
         lottery_selected.clear()
-    elif option_name == "Bill Of Lading [1]":
+    elif action_name == "Bill Of Lading [1]":
         bol1_value.set("")
-    elif option_name == "Bill Of Lading [2]":
+    elif action_name == "Bill Of Lading [2]":
         bol2_value.set("")
-    elif option_name == "Bill Of Lading [3]":
+    elif action_name == "Bill Of Lading [3]":
         bol3_value.set("")
 
 
@@ -366,14 +426,25 @@ def remove_category(category_name):
         for name, option_names in custom_options.items()
         if name != category_name
     }
+    new_category_order = [
+        name for name in category_options if name != category_name
+    ]
+    new_option_order = {
+        name: list(option_names)
+        for name, option_names in category_options.items()
+        if name != category_name
+    }
     new_hidden_categories = set(hidden_categories)
-    if category_name in default_category_options:
-        new_hidden_categories.add(category_name)
+    action_name = category_action_names.get(category_name, category_name)
+    if action_name in default_category_options:
+        new_hidden_categories.add(action_name)
     if not save_customizations(
         new_custom_categories,
         new_custom_options,
         new_hidden_categories,
         hidden_options,
+        saved_category_order=new_category_order,
+        saved_option_order=new_option_order,
     ):
         return
 
@@ -387,6 +458,7 @@ def remove_category(category_name):
     options_notebook.forget(category_frames[category_name])
     category_frames.pop(category_name).destroy()
     category_options.pop(category_name)
+    category_action_names.pop(category_name, None)
     for option_name in removed_options:
         remove_option_state(option_name)
     update_result()
@@ -405,17 +477,26 @@ def remove_option(category_name, option_name):
         for name, option_names in custom_options.items()
     }
     new_hidden_options = set(hidden_options)
+    action_name = option_action_names.get(option_name, option_name)
+    new_option_order = {
+        name: [
+            current for current in option_names
+            if current != option_name
+        ] if name == category_name else list(option_names)
+        for name, option_names in category_options.items()
+    }
     if option_name in new_custom_options.get(category_name, []):
         new_custom_options[category_name].remove(option_name)
         if not new_custom_options[category_name]:
             new_custom_options.pop(category_name)
     else:
-        new_hidden_options.add(option_name)
+        new_hidden_options.add(action_name)
     if not save_customizations(
         custom_categories,
         new_custom_options,
         hidden_categories,
         new_hidden_options,
+        saved_option_order=new_option_order,
     ):
         return
 
@@ -543,6 +624,430 @@ def show_remove_choices(event=None):
     activate_popup(popup, remove_category_button)
 
 
+def rename_category(category_name, new_name):
+    new_name = new_name.strip()
+    if not new_name:
+        messagebox.showwarning("Invalid Category", "Category name cannot be empty.", parent=root)
+        return
+    if any(name.casefold() == new_name.casefold() for name in category_frames if name != category_name):
+        messagebox.showwarning("Duplicate Category", "That category already exists.", parent=root)
+        return
+
+    action_name = category_action_names.get(category_name, category_name)
+    allowed_category_names = {
+        action_name.casefold(),
+        category_labels.get(action_name, action_name).casefold(),
+    }
+    reserved_categories = {
+        name.casefold()
+        for name in (*default_category_options, *category_labels.values())
+        if name.casefold() not in allowed_category_names
+    }
+    if new_name.casefold() in reserved_categories:
+        messagebox.showwarning("Duplicate Category", "That category name is reserved.", parent=root)
+        return
+    new_categories = dict(custom_categories)
+    new_options = {
+        name: list(option_names)
+        for name, option_names in custom_options.items()
+    }
+    new_category_labels = dict(category_labels)
+    new_category_order = [new_name if name == category_name else name for name in category_options]
+    new_option_order = {
+        (new_name if name == category_name else name): list(option_names)
+        for name, option_names in category_options.items()
+    }
+    if category_name in new_categories:
+        new_categories[new_name] = new_categories.pop(category_name)
+    if category_name in new_options:
+        new_options[new_name] = new_options.pop(category_name)
+    if action_name in default_category_options:
+        new_category_labels[action_name] = new_name
+    if not save_customizations(
+        new_categories,
+        new_options,
+        saved_category_labels=new_category_labels,
+        saved_category_order=new_category_order,
+        saved_option_order=new_option_order,
+    ):
+        return
+
+    renamed_category_options = {
+        (new_name if name == category_name else name): option_names
+        for name, option_names in category_options.items()
+    }
+    renamed_category_frames = {
+        (new_name if name == category_name else name): frame
+        for name, frame in category_frames.items()
+    }
+    renamed_category_actions = {
+        (new_name if name == category_name else name): action
+        for name, action in category_action_names.items()
+    }
+    category_options.clear()
+    category_options.update(renamed_category_options)
+    category_frames.clear()
+    category_frames.update(renamed_category_frames)
+    category_action_names.clear()
+    category_action_names.update(renamed_category_actions)
+    custom_categories.clear()
+    custom_categories.update(new_categories)
+    custom_options.clear()
+    custom_options.update(new_options)
+    category_labels.clear()
+    category_labels.update(new_category_labels)
+    options_notebook.tab(category_frames[new_name], text=new_name)
+
+
+def rename_option(category_name, option_name, new_name):
+    new_name = new_name.strip()
+    if not new_name:
+        messagebox.showwarning("Invalid Option", "Option name cannot be empty.", parent=root)
+        return
+    if any(name.casefold() == new_name.casefold() for name in all_options if name != option_name):
+        messagebox.showwarning("Duplicate Option", "That option already exists.", parent=root)
+        return
+    if new_name.casefold() == "timestamp":
+        messagebox.showwarning("Reserved Option", "Timestamp is a reserved option name.", parent=root)
+        return
+
+    action_name = option_action_names.get(option_name, option_name)
+    reserved_options = {
+        name.casefold()
+        for option_names in default_category_options.values()
+        for name in option_names
+    }
+    reserved_options.update(name.casefold() for name in option_labels.values())
+    allowed_option_names = {
+        action_name.casefold(),
+        option_labels.get(action_name, action_name).casefold(),
+    }
+    if (
+        new_name.casefold() in reserved_options
+        and new_name.casefold() not in allowed_option_names
+    ):
+        messagebox.showwarning("Reserved Option", "That option name is reserved.", parent=root)
+        return
+    new_categories = {
+        name: list(option_names)
+        for name, option_names in custom_categories.items()
+    }
+    new_options = {
+        name: list(option_names)
+        for name, option_names in custom_options.items()
+    }
+    new_option_labels = dict(option_labels)
+    new_option_names = [
+        new_name if name == option_name else name
+        for name in category_options[category_name]
+    ]
+    new_option_order = {
+        name: (
+            new_option_names
+            if name == category_name
+            else list(option_names)
+        )
+        for name, option_names in category_options.items()
+    }
+    if option_name in new_options.get(category_name, []):
+        new_options[category_name] = [
+            new_name if name == option_name else name
+            for name in new_options[category_name]
+        ]
+    if action_name in {
+        name
+        for option_names in default_category_options.values()
+        for name in option_names
+    }:
+        new_option_labels[action_name] = new_name
+    if not save_customizations(
+        new_categories,
+        new_options,
+        saved_option_labels=new_option_labels,
+        saved_option_order=new_option_order,
+    ):
+        return
+
+    category_options[category_name] = new_option_names
+    if option_name in custom_options.get(category_name, []):
+        custom_options[category_name] = new_options[category_name]
+    option_labels.clear()
+    option_labels.update(new_option_labels)
+    option_action_names[new_name] = option_action_names.pop(option_name, option_name)
+    all_options[new_name] = all_options.pop(option_name)
+    if option_name in click_order:
+        click_order[click_order.index(option_name)] = new_name
+    option_widget = option_widgets.pop(option_name)
+    option_widget.configure(text=new_name)
+    option_widgets[new_name] = option_widget
+    update_result()
+
+
+def open_rename_option_dialog():
+    categories_with_options = [
+        name for name, option_names in category_options.items() if option_names
+    ]
+    if not categories_with_options:
+        messagebox.showinfo("Rename Option", "There are no options to rename.", parent=root)
+        return
+
+    popup = tk.Toplevel(root)
+    popup.title("Rename Option")
+    popup.geometry("320x190")
+    popup.transient(root)
+    tk.Label(popup, text="Category:").pack(anchor="w", padx=10, pady=(10, 2))
+    category_choice = ttk.Combobox(
+        popup,
+        values=categories_with_options,
+        state="readonly",
+    )
+    category_choice.pack(fill="x", padx=10)
+    category_choice.current(0)
+    tk.Label(popup, text="Option:").pack(anchor="w", padx=10, pady=(6, 2))
+    option_choice = ttk.Combobox(popup, state="readonly")
+    option_choice.pack(fill="x", padx=10)
+    tk.Label(popup, text="New name:").pack(anchor="w", padx=10, pady=(6, 2))
+    name_entry = tk.Entry(popup)
+    name_entry.pack(fill="x", padx=10)
+
+    def update_options(event=None):
+        option_choice["values"] = category_options[category_choice.get()]
+        option_choice.current(0)
+
+    category_choice.bind("<<ComboboxSelected>>", update_options)
+    update_options()
+
+    def confirm(event=None):
+        selected_category = category_choice.get()
+        selected_option = option_choice.get()
+        popup.destroy()
+        rename_option(selected_category, selected_option, name_entry.get())
+
+    buttons = tk.Frame(popup)
+    buttons.pack(pady=8)
+    tk.Button(buttons, text="Rename", width=10, command=confirm).pack(side="left", padx=5)
+    tk.Button(buttons, text="Cancel", width=10, command=popup.destroy).pack(side="left", padx=5)
+    popup.bind("<Return>", confirm)
+    popup.bind("<Escape>", lambda event: popup.destroy())
+    activate_popup(popup, name_entry)
+
+
+def open_rename_category_dialog():
+    if not category_options:
+        messagebox.showinfo("Rename Category", "There are no categories to rename.", parent=root)
+        return
+
+    popup = tk.Toplevel(root)
+    popup.title("Rename Category")
+    popup.geometry("300x140")
+    popup.transient(root)
+    tk.Label(popup, text="Category:").pack(anchor="w", padx=10, pady=(10, 2))
+    category_choice = ttk.Combobox(
+        popup,
+        values=list(category_options),
+        state="readonly",
+    )
+    category_choice.pack(fill="x", padx=10)
+    category_choice.current(0)
+    tk.Label(popup, text="New name:").pack(anchor="w", padx=10, pady=(6, 2))
+    name_entry = tk.Entry(popup)
+    name_entry.pack(fill="x", padx=10)
+
+    def confirm(event=None):
+        selected_category = category_choice.get()
+        popup.destroy()
+        rename_category(selected_category, name_entry.get())
+
+    buttons = tk.Frame(popup)
+    buttons.pack(pady=8)
+    tk.Button(buttons, text="Rename", width=10, command=confirm).pack(side="left", padx=5)
+    tk.Button(buttons, text="Cancel", width=10, command=popup.destroy).pack(side="left", padx=5)
+    popup.bind("<Return>", confirm)
+    popup.bind("<Escape>", lambda event: popup.destroy())
+    activate_popup(popup, name_entry)
+
+
+def open_reorder_dialog(title, item_names, on_reorder):
+    popup = tk.Toplevel(root)
+    popup.title(title)
+    popup.geometry("300x300")
+    popup.transient(root)
+    listbox = tk.Listbox(popup, exportselection=False)
+    listbox.pack(fill="both", expand=True, padx=10, pady=(10, 5))
+    for name in item_names:
+        listbox.insert(tk.END, name)
+    if item_names:
+        listbox.selection_set(0)
+
+    def move_selected(offset):
+        selection = listbox.curselection()
+        if not selection:
+            return
+        old_index = selection[0]
+        new_index = old_index + offset
+        if not 0 <= new_index < listbox.size():
+            return
+        item = listbox.get(old_index)
+        listbox.delete(old_index)
+        listbox.insert(new_index, item)
+        listbox.selection_set(new_index)
+        listbox.activate(new_index)
+
+    controls = tk.Frame(popup)
+    controls.pack(pady=5)
+    tk.Button(controls, text="Move Up", command=lambda: move_selected(-1)).pack(
+        side="left",
+        padx=5,
+    )
+    tk.Button(controls, text="Move Down", command=lambda: move_selected(1)).pack(
+        side="left",
+        padx=5,
+    )
+
+    def confirm(event=None):
+        on_reorder(listbox.get(0, tk.END))
+        popup.destroy()
+
+    tk.Button(popup, text="Save Order", command=confirm).pack(pady=(0, 10))
+    popup.bind("<Return>", confirm)
+    popup.bind("<Escape>", lambda event: popup.destroy())
+    activate_popup(popup, listbox)
+
+
+def reorder_categories(new_order):
+    new_option_order = {
+        name: list(category_options[name])
+        for name in new_order
+    }
+    if not save_customizations(
+        custom_categories,
+        custom_options,
+        saved_category_order=new_order,
+        saved_option_order=new_option_order,
+    ):
+        return
+    reordered_options = {name: category_options[name] for name in new_order}
+    reordered_frames = {name: category_frames[name] for name in new_order}
+    category_options.clear()
+    category_options.update(reordered_options)
+    category_frames.clear()
+    category_frames.update(reordered_frames)
+    for index, name in enumerate(new_order):
+        options_notebook.insert(index, category_frames[name])
+
+
+def reorder_options(category_name, new_order):
+    new_option_order = {
+        name: (new_order if name == category_name else list(option_names))
+        for name, option_names in category_options.items()
+    }
+    if not save_customizations(
+        custom_categories,
+        custom_options,
+        saved_option_order=new_option_order,
+    ):
+        return
+    category_options[category_name] = list(new_order)
+    for option_name in new_order:
+        option_widgets[option_name].pack_forget()
+    for option_name in new_order:
+        option_widgets[option_name].pack(anchor="w")
+
+
+def open_reorder_options_dialog():
+    if not category_options:
+        messagebox.showinfo("Reorder Options", "There are no categories.", parent=root)
+        return
+
+    popup = tk.Toplevel(root)
+    popup.title("Choose Category")
+    popup.geometry("300x120")
+    popup.transient(root)
+    tk.Label(popup, text="Choose a category whose options to reorder:").pack(
+        padx=10,
+        pady=(12, 4),
+    )
+    category_choice = ttk.Combobox(
+        popup,
+        values=list(category_options),
+        state="readonly",
+    )
+    category_choice.pack(fill="x", padx=10)
+    category_choice.current(0)
+
+    def confirm(event=None):
+        category_name = category_choice.get()
+        popup.destroy()
+        open_reorder_dialog(
+            "Reorder Options",
+            category_options[category_name],
+            lambda order: reorder_options(category_name, order),
+        )
+
+    buttons = tk.Frame(popup)
+    buttons.pack(pady=8)
+    tk.Button(buttons, text="Continue", width=10, command=confirm).pack(side="left", padx=5)
+    tk.Button(buttons, text="Cancel", width=10, command=popup.destroy).pack(side="left", padx=5)
+    popup.bind("<Return>", confirm)
+    popup.bind("<Escape>", lambda event: popup.destroy())
+    activate_popup(popup, category_choice)
+
+
+def show_organize_choices(event=None):
+    if event is not None and event.widget.winfo_toplevel() is not root:
+        return
+
+    popup = tk.Toplevel(root)
+    popup.title("Input Logger Tool")
+    popup.geometry("300x130")
+    popup.transient(root)
+
+    def choose(action):
+        popup.destroy()
+        action()
+
+    buttons = tk.Frame(popup)
+    buttons.pack(fill="both", expand=True, padx=8, pady=8)
+    buttons.grid_columnconfigure((0, 1), weight=1, uniform="organize")
+    rename_category_button = tk.Button(
+        buttons,
+        text="Rename Category",
+        command=lambda: choose(open_rename_category_dialog),
+    )
+    rename_category_button.grid(row=0, column=0, sticky="ew", padx=4, pady=4)
+    tk.Button(
+        buttons,
+        text="Rename Option",
+        command=lambda: choose(open_rename_option_dialog),
+    ).grid(row=0, column=1, sticky="ew", padx=4, pady=4)
+    tk.Button(
+        buttons,
+        text="Reorder Tabs",
+        command=lambda: choose(
+            lambda: open_reorder_dialog(
+                "Reorder Tabs",
+                list(category_options),
+                reorder_categories,
+            )
+        ),
+    ).grid(row=1, column=0, sticky="ew", padx=4, pady=4)
+    tk.Button(
+        buttons,
+        text="Reorder Options",
+        command=lambda: choose(open_reorder_options_dialog),
+    ).grid(row=1, column=1, sticky="ew", padx=4, pady=4)
+    popup.bind("<Escape>", lambda key_event: popup.destroy())
+    activate_popup(popup, rename_category_button)
+
+
+def toggle_timestamp(event=None):
+    if event is not None and event.widget.winfo_toplevel() is not root:
+        return
+    all_options["Timestamp"].set(not all_options["Timestamp"].get())
+    on_checkbox_toggle("Timestamp")
+    return "break"
+
+
 # ---------------------------
 # Popups Logic
 # ---------------------------
@@ -641,10 +1146,13 @@ all_options = {}
 bol1_value, bol2_value, bol3_value = tk.StringVar(), tk.StringVar(), tk.StringVar()
 ncr_selected, npr_selected, loyalty_selected, lottery_selected = [], [], [], []
 category_frames = {}
+option_widgets = {}
 custom_categories = {}
 custom_options = {}
 hidden_categories = set()
 hidden_options = set()
+category_labels = {}
+option_labels = {}
 
 customization_path = os.path.join(
     os.environ.get("APPDATA", os.path.expanduser("~")),
@@ -661,33 +1169,83 @@ try:
     saved_options = saved_customizations.get("options", {})
     saved_removed_categories = saved_customizations.get("removed_categories", [])
     saved_removed_options = saved_customizations.get("removed_options", [])
+    saved_category_labels = saved_customizations.get("category_labels", {})
+    saved_option_labels = saved_customizations.get("option_labels", {})
+    saved_category_order = saved_customizations.get("category_order")
+    saved_option_order = saved_customizations.get("option_order")
     if (
         not isinstance(saved_categories, dict)
         or not isinstance(saved_options, dict)
+        or not isinstance(saved_category_labels, dict)
+        or any(
+            not isinstance(old, str)
+            or not isinstance(new, str)
+            or not old.strip()
+            or not new.strip()
+            for old, new in saved_category_labels.items()
+        )
+        or not isinstance(saved_option_labels, dict)
+        or any(
+            not isinstance(old, str)
+            or not isinstance(new, str)
+            or not old.strip()
+            or not new.strip()
+            for old, new in saved_option_labels.items()
+        )
         or not isinstance(saved_removed_categories, list)
         or any(not isinstance(name, str) or not name.strip() for name in saved_removed_categories)
         or not isinstance(saved_removed_options, list)
         or any(not isinstance(name, str) or not name.strip() for name in saved_removed_options)
+        or (
+            saved_category_order is not None
+            and (
+                not isinstance(saved_category_order, list)
+                or any(not isinstance(name, str) for name in saved_category_order)
+            )
+        )
+        or (saved_option_order is not None and not isinstance(saved_option_order, dict))
     ):
         raise ValueError("Customization categories and options must be JSON objects.")
 
+    category_labels.update(saved_category_labels)
+    option_labels.update(saved_option_labels)
     hidden_categories.update(saved_removed_categories)
     hidden_options.update(saved_removed_options)
-    category_options = {
-        category_name: [
-            option_name
-            for option_name in option_names
-            if option_name not in hidden_options
-        ]
-        for category_name, option_names in default_category_options.items()
-        if category_name not in hidden_categories
+    category_options = {}
+    loaded_category_names = set()
+    loaded_option_names = set()
+    for original_category, original_options in default_category_options.items():
+        if original_category in hidden_categories:
+            continue
+        category_name = category_labels.get(original_category, original_category)
+        if category_name.casefold() in loaded_category_names:
+            raise ValueError("Customization file contains duplicate category names.")
+        loaded_category_names.add(category_name.casefold())
+        category_action_names[category_name] = original_category
+        visible_options = []
+        for original_option in original_options:
+            if original_option in hidden_options:
+                continue
+            option_name = option_labels.get(original_option, original_option)
+            if option_name.casefold() in loaded_option_names:
+                raise ValueError("Customization file contains duplicate option names.")
+            loaded_option_names.add(option_name.casefold())
+            option_action_names[option_name] = original_option
+            visible_options.append(option_name)
+        category_options[category_name] = visible_options
+    used_category_names = {
+        name.casefold()
+        for name in (
+            list(default_category_options)
+            + list(category_labels.values())
+        )
     }
-    used_category_names = {name.casefold() for name in default_category_options}
     used_option_names = {
         name.casefold()
         for option_names in default_category_options.values()
         for name in option_names
     }
+    used_option_names.update(name.casefold() for name in option_labels.values())
     used_option_names.add("timestamp")
     for category_name, option_names in saved_categories.items():
         if (
@@ -699,14 +1257,19 @@ try:
                 not isinstance(option_name, str)
                 or not option_name.strip()
                 or option_name.casefold() in used_option_names
+                or option_name.casefold() in loaded_option_names
                 for option_name in option_names
             )
         ):
             raise ValueError("Customization file contains an invalid or duplicate category.")
         custom_categories[category_name] = option_names
         category_options[category_name] = list(option_names)
+        category_action_names[category_name] = category_name
         used_category_names.add(category_name.casefold())
-        used_option_names.update(option_name.casefold() for option_name in option_names)
+        for option_name in option_names:
+            loaded_option_names.add(option_name.casefold())
+            option_action_names[option_name] = option_name
+            used_option_names.add(option_name.casefold())
     for category_name, option_names in saved_options.items():
         if (
             category_name not in category_options
@@ -715,13 +1278,39 @@ try:
                 not isinstance(option_name, str)
                 or not option_name.strip()
                 or option_name.casefold() in used_option_names
+                or option_name.casefold() in loaded_option_names
                 for option_name in option_names
             )
         ):
             raise ValueError("Customization file contains an invalid or duplicate option.")
         custom_options[category_name] = list(option_names)
         category_options[category_name].extend(option_names)
-        used_option_names.update(option_name.casefold() for option_name in option_names)
+        for option_name in option_names:
+            loaded_option_names.add(option_name.casefold())
+            option_action_names[option_name] = option_name
+            used_option_names.add(option_name.casefold())
+    if saved_category_order is not None:
+        if (
+            len(saved_category_order) != len(category_options)
+            or set(saved_category_order) != set(category_options)
+        ):
+            raise ValueError("Customization file contains an invalid category order.")
+        category_options = {
+            name: category_options[name]
+            for name in saved_category_order
+        }
+    if saved_option_order is not None:
+        if set(saved_option_order) != set(category_options):
+            raise ValueError("Customization file contains an invalid option order.")
+        for category_name, saved_order in saved_option_order.items():
+            if (
+                not isinstance(saved_order, list)
+                or any(not isinstance(name, str) for name in saved_order)
+                or len(saved_order) != len(category_options[category_name])
+                or set(saved_order) != set(category_options[category_name])
+            ):
+                raise ValueError("Customization file contains an invalid option order.")
+            category_options[category_name] = list(saved_order)
 except FileNotFoundError:
     pass
 except (OSError, json.JSONDecodeError, ValueError) as error:
@@ -734,10 +1323,19 @@ except (OSError, json.JSONDecodeError, ValueError) as error:
     custom_options.clear()
     hidden_categories.clear()
     hidden_options.clear()
+    category_labels.clear()
+    option_labels.clear()
+    category_action_names.clear()
+    option_action_names.clear()
     category_options = {
         name: list(option_names)
         for name, option_names in default_category_options.items()
     }
+    category_action_names.update(
+        {name: name for name in default_category_options}
+    )
+    for option_names in default_category_options.values():
+        option_action_names.update({name: name for name in option_names})
 
 for option_names in category_options.values():
     for name in option_names:
@@ -772,5 +1370,8 @@ root.bind_all("<KeyPress-plus>", show_add_choices)
 root.bind_all("<KP_Add>", show_add_choices)
 root.bind_all("<KeyPress-minus>", show_remove_choices)
 root.bind_all("<KP_Subtract>", show_remove_choices)
+root.bind_all("<KeyPress-asterisk>", show_organize_choices)
+root.bind_all("<KP_Multiply>", show_organize_choices)
+root.bind_all("<KeyPress-grave>", toggle_timestamp)
 tk.Label(root, text="Credited to Maal", font=("Arial", 7), fg="gray").pack(side="bottom", pady=2)
 root.mainloop()
