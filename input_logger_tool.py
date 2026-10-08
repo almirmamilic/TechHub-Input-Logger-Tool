@@ -45,6 +45,10 @@ dark_mode_enabled = False
 click_order = []
 option_action_names = {}
 category_action_names = {}
+custom_option_types = {}
+custom_option_choices = {}
+custom_text_values = {}
+custom_multi_selected = {}
 
 # ---------------------------
 # Functions
@@ -86,6 +90,21 @@ def on_checkbox_toggle(name):
             open_multi_checkbox_popup(name, ["FL Lottery", "IN Lottery", "IL Lottery"], lottery_selected)
         else:
             lottery_selected.clear()
+    elif name in custom_option_types:
+        option_type = custom_option_types[name]
+        if all_options[name].get() and option_type == "text":
+            open_custom_text_popup(name)
+        elif all_options[name].get() and option_type == "multi":
+            open_multi_checkbox_popup(
+                name,
+                custom_option_choices[name],
+                custom_multi_selected.setdefault(name, []),
+            )
+        elif not all_options[name].get():
+            if option_type == "text":
+                custom_text_values[name].set("")
+            elif option_type == "multi":
+                custom_multi_selected[name].clear()
             
     update_result()
 
@@ -101,7 +120,13 @@ def update_result():
             
         # Reverted Logic for NCR, NPR, Loyalty
         action_name = option_action_names.get(name, name)
-        if action_name == "NCR":
+        custom_type = custom_option_types.get(name, "checkbox")
+        if custom_type == "text" and name in custom_text_values:
+            selected.append(f"{name}#{custom_text_values[name].get().strip()}")
+        elif custom_type == "multi" and name in custom_multi_selected:
+            choices = custom_multi_selected[name]
+            selected.append(f"{name}({', '.join(choices)})" if choices else name)
+        elif action_name == "NCR":
             if ncr_selected:
                 selected.append(f"{name}({', '.join(ncr_selected)})")
             else:
@@ -151,6 +176,10 @@ def copy_to_clipboard(event=None):
 def clear_all():
     for name, var in all_options.items():
         var.set(False)
+    for value in custom_text_values.values():
+        value.set("")
+    for selected in custom_multi_selected.values():
+        selected.clear()
     click_order.clear()
     bol1_value.set("")
     bol2_value.set("")
@@ -187,6 +216,8 @@ def save_customizations(
     saved_option_labels=None,
     saved_category_order=None,
     saved_option_order=None,
+    saved_option_types=None,
+    saved_option_choices=None,
 ):
     config_dir = os.path.join(
         os.environ.get("APPDATA", os.path.expanduser("~")),
@@ -224,6 +255,16 @@ def save_customizations(
                     if saved_option_order is None
                     else saved_option_order,
                     "dark_mode": dark_mode_enabled,
+                    "option_types": (
+                        custom_option_types
+                        if saved_option_types is None
+                        else saved_option_types
+                    ),
+                    "option_choices": (
+                        custom_option_choices
+                        if saved_option_choices is None
+                        else saved_option_choices
+                    ),
                 },
                 config_file,
                 indent=2,
@@ -317,13 +358,13 @@ def add_new_option():
 
     dialog = tk.Toplevel(root)
     dialog.title("Add New Option")
-    dialog.geometry("300x150")
+    dialog.geometry("340x390")
     dialog.transient(root)
 
     tk.Label(dialog, text="Option name:").pack(anchor="w", padx=10, pady=(10, 2))
     name_entry = tk.Entry(dialog)
     name_entry.pack(fill="x", padx=10)
-    tk.Label(dialog, text="Category:").pack(anchor="w", padx=10, pady=(8, 2))
+    tk.Label(dialog, text="Category:").pack(anchor="w", padx=10, pady=(6, 2))
     category_choice = ttk.Combobox(
         dialog,
         values=list(category_frames),
@@ -331,6 +372,51 @@ def add_new_option():
     )
     category_choice.pack(fill="x", padx=10)
     category_choice.current(0)
+    tk.Label(dialog, text="Option type:").pack(anchor="w", padx=10, pady=(6, 2))
+    option_type_choice = ttk.Combobox(
+        dialog,
+        values=[
+            "Standard",
+            "Text Entry",
+            "Multiple Choices",
+        ],
+        state="readonly",
+    )
+    option_type_choice.pack(fill="x", padx=10)
+    option_type_choice.current(0)
+
+    choices_frame = tk.Frame(dialog)
+    tk.Label(
+        choices_frame,
+        text="Choices (one per line):",
+    ).pack(anchor="w", pady=(6, 2))
+    choices_text = tk.Text(
+        choices_frame,
+        height=6,
+        wrap="word",
+        bg=COLORS["surface"],
+        fg=COLORS["text"],
+        insertbackground=COLORS["text"],
+        relief="flat",
+        highlightthickness=1,
+        highlightbackground=COLORS["border"],
+        highlightcolor=COLORS["accent"],
+    )
+    choices_text.pack(fill="both", expand=True)
+
+    def insert_choice_newline(event):
+        choices_text.insert("insert", "\n")
+        return "break"
+
+    choices_text.bind("<Return>", insert_choice_newline)
+
+    def update_type_fields(event=None):
+        if option_type_choice.current() == 2:
+            choices_frame.pack(fill="both", expand=True, padx=10, before=buttons)
+        else:
+            choices_frame.pack_forget()
+
+    option_type_choice.bind("<<ComboboxSelected>>", update_type_fields)
 
     def confirm(event=None):
         option_name = name_entry.get().strip()
@@ -353,11 +439,44 @@ def add_new_option():
             name_entry.focus_set()
             return
 
+        option_type = ("checkbox", "text", "multi")[option_type_choice.current()]
+        choices = []
+        if option_type == "multi":
+            choices = [
+                choice.strip()
+                for choice in choices_text.get("1.0", "end").splitlines()
+                if choice.strip()
+            ]
+            if not choices:
+                messagebox.showwarning(
+                    "Invalid Choices",
+                    "Enter at least one choice for a multiple-choice option.",
+                    parent=dialog,
+                )
+                choices_text.focus_set()
+                return
+            if len({choice.casefold() for choice in choices}) != len(choices):
+                messagebox.showwarning(
+                    "Duplicate Choices",
+                    "Each choice must be unique.",
+                    parent=dialog,
+                )
+                choices_text.focus_set()
+                return
+
         new_custom_options = {
             name: list(option_names)
             for name, option_names in custom_options.items()
         }
         new_custom_options.setdefault(category_name, []).append(option_name)
+        new_option_types = dict(custom_option_types)
+        new_option_types[option_name] = option_type
+        new_option_choices = {
+            name: list(option_names)
+            for name, option_names in custom_option_choices.items()
+        }
+        if option_type == "multi":
+            new_option_choices[option_name] = choices
         new_option_order = {
             name: list(option_names)
             for name, option_names in category_options.items()
@@ -367,15 +486,26 @@ def add_new_option():
             custom_categories,
             new_custom_options,
             saved_option_order=new_option_order,
+            saved_option_types=new_option_types,
+            saved_option_choices=new_option_choices,
         ):
             return
 
         custom_options[category_name] = new_custom_options[category_name]
+        custom_option_types.clear()
+        custom_option_types.update(new_option_types)
+        custom_option_choices.clear()
+        custom_option_choices.update(new_option_choices)
         category_options[category_name].append(option_name)
         option_action_names[option_name] = option_name
+        if option_type == "text":
+            custom_text_values[option_name] = tk.StringVar()
+        elif option_type == "multi":
+            custom_multi_selected[option_name] = []
         add_option_checkbox(category_name, option_name)
         dialog.destroy()
 
+    update_type_fields()
     buttons = tk.Frame(dialog)
     buttons.pack(pady=10)
     tk.Button(buttons, text="Add", width=10, command=confirm).pack(side="left", padx=5)
@@ -419,6 +549,10 @@ def remove_option_state(option_name):
     action_name = option_action_names.pop(option_name, option_name)
     option_widgets.pop(option_name, None)
     all_options.pop(option_name, None)
+    custom_option_types.pop(option_name, None)
+    custom_option_choices.pop(option_name, None)
+    custom_text_values.pop(option_name, None)
+    custom_multi_selected.pop(option_name, None)
     if option_name in click_order:
         click_order.remove(option_name)
     if action_name == "NCR":
@@ -455,6 +589,17 @@ def remove_category(category_name):
         for name, option_names in custom_options.items()
         if name != category_name
     }
+    removed_options = list(category_options[category_name])
+    new_option_types = {
+        name: option_type
+        for name, option_type in custom_option_types.items()
+        if name not in removed_options
+    }
+    new_option_choices = {
+        name: list(choices)
+        for name, choices in custom_option_choices.items()
+        if name not in removed_options
+    }
     new_category_order = [
         name for name in category_options if name != category_name
     ]
@@ -474,10 +619,11 @@ def remove_category(category_name):
         hidden_options,
         saved_category_order=new_category_order,
         saved_option_order=new_option_order,
+        saved_option_types=new_option_types,
+        saved_option_choices=new_option_choices,
     ):
         return
 
-    removed_options = list(category_options[category_name])
     hidden_categories.clear()
     hidden_categories.update(new_hidden_categories)
     custom_categories.clear()
@@ -505,6 +651,13 @@ def remove_option(category_name, option_name):
         name: list(option_names)
         for name, option_names in custom_options.items()
     }
+    new_option_types = dict(custom_option_types)
+    new_option_types.pop(option_name, None)
+    new_option_choices = {
+        name: list(choices)
+        for name, choices in custom_option_choices.items()
+        if name != option_name
+    }
     new_hidden_options = set(hidden_options)
     action_name = option_action_names.get(option_name, option_name)
     new_option_order = {
@@ -526,6 +679,8 @@ def remove_option(category_name, option_name):
         hidden_categories,
         new_hidden_options,
         saved_option_order=new_option_order,
+        saved_option_types=new_option_types,
+        saved_option_choices=new_option_choices,
     ):
         return
 
@@ -778,6 +933,15 @@ def rename_option(category_name, option_name, new_name):
         )
         for name, option_names in category_options.items()
     }
+    new_option_types = dict(custom_option_types)
+    if option_name in new_option_types:
+        new_option_types[new_name] = new_option_types.pop(option_name)
+    new_option_choices = {
+        name: list(choices)
+        for name, choices in custom_option_choices.items()
+    }
+    if option_name in new_option_choices:
+        new_option_choices[new_name] = new_option_choices.pop(option_name)
     if option_name in new_options.get(category_name, []):
         new_options[category_name] = [
             new_name if name == option_name else name
@@ -794,16 +958,26 @@ def rename_option(category_name, option_name, new_name):
         new_options,
         saved_option_labels=new_option_labels,
         saved_option_order=new_option_order,
+        saved_option_types=new_option_types,
+        saved_option_choices=new_option_choices,
     ):
         return
 
     category_options[category_name] = new_option_names
     if option_name in custom_options.get(category_name, []):
         custom_options[category_name] = new_options[category_name]
+    custom_option_types.clear()
+    custom_option_types.update(new_option_types)
+    custom_option_choices.clear()
+    custom_option_choices.update(new_option_choices)
     option_labels.clear()
     option_labels.update(new_option_labels)
     option_action_names[new_name] = option_action_names.pop(option_name, option_name)
     all_options[new_name] = all_options.pop(option_name)
+    if option_name in custom_text_values:
+        custom_text_values[new_name] = custom_text_values.pop(option_name)
+    if option_name in custom_multi_selected:
+        custom_multi_selected[new_name] = custom_multi_selected.pop(option_name)
     if option_name in click_order:
         click_order[click_order.index(option_name)] = new_name
     option_widget = option_widgets.pop(option_name)
@@ -868,7 +1042,7 @@ def open_rename_category_dialog():
 
     popup = tk.Toplevel(root)
     popup.title("Rename Category")
-    popup.geometry("300x140")
+    popup.geometry("300x170")
     popup.transient(root)
     tk.Label(popup, text="Category:").pack(anchor="w", padx=10, pady=(10, 2))
     category_choice = ttk.Combobox(
@@ -884,8 +1058,9 @@ def open_rename_category_dialog():
 
     def confirm(event=None):
         selected_category = category_choice.get()
+        new_name = name_entry.get()
         popup.destroy()
-        rename_category(selected_category, name_entry.get())
+        rename_category(selected_category, new_name)
 
     buttons = tk.Frame(popup)
     buttons.pack(pady=8)
@@ -1123,16 +1298,49 @@ def open_bol_popup(bol_name, bol_var):
     popup.bind('<Escape>', cancel_esc)
     activate_popup(popup, entry)
 
+
+def open_custom_text_popup(option_name):
+    popup = tk.Toplevel(root)
+    popup.title(f"Enter {option_name}")
+    popup.geometry("280x130")
+    popup.transient(root)
+    tk.Label(popup, text=f"Enter {option_name} value:").pack(pady=5)
+    entry = tk.Entry(popup, textvariable=custom_text_values[option_name])
+    entry.pack(fill="x", padx=12, pady=5)
+
+    def confirm(event=None):
+        popup.destroy()
+        update_result()
+
+    def cancel(event=None):
+        all_options[option_name].set(False)
+        if option_name in click_order:
+            click_order.remove(option_name)
+        custom_text_values[option_name].set("")
+        popup.destroy()
+        update_result()
+
+    tk.Button(popup, text="Confirm", command=confirm).pack(pady=5)
+    popup.bind("<Return>", confirm)
+    popup.bind("<Escape>", cancel)
+    activate_popup(popup, entry)
+
+
 def open_multi_checkbox_popup(name, options_list, selected_list):
     popup = tk.Toplevel(root)
     popup.title(f"Select {name}")
-    popup.geometry("250x240")
+    popup.geometry(f"250x{min(240, max(125, 70 + len(options_list) * 28))}")
     popup.transient(root)
     vars, widgets = [], []
     for opt in options_list:
         var = tk.BooleanVar(value=(opt in selected_list))
-        cb = tk.Checkbutton(popup, text=opt, variable=var)
-        cb.pack(anchor="w", padx=20)
+        cb = ttk.Checkbutton(
+            popup,
+            text=opt,
+            variable=var,
+            style="MultiChoice.TCheckbutton",
+        )
+        cb.pack(anchor="w", padx=12, pady=1)
         vars.append((opt, var))
         widgets.append(cb)
 
@@ -1140,8 +1348,22 @@ def open_multi_checkbox_popup(name, options_list, selected_list):
     def focus_prev(event): event.widget.tk_focusPrev().focus(); return "break"
     def toggle_space(event): event.widget.toggle(); return "break"
 
-    for cb in widgets:
-        cb.bind("<Down>", focus_next); cb.bind("<Up>", focus_prev); cb.bind("<space>", toggle_space)
+    def set_choice(event, choice_var, selected):
+        choice_var.set(selected)
+        return "break"
+
+    for cb, (_, choice_var) in zip(widgets, vars):
+        cb.bind("<Down>", focus_next)
+        cb.bind("<Up>", focus_prev)
+        cb.bind("<space>", toggle_space)
+        cb.bind(
+            "<Left>",
+            lambda event, var=choice_var: set_choice(event, var, True),
+        )
+        cb.bind(
+            "<Right>",
+            lambda event, var=choice_var: set_choice(event, var, False),
+        )
 
     def confirm(event=None):
         selected_list.clear()
@@ -1158,7 +1380,7 @@ def open_multi_checkbox_popup(name, options_list, selected_list):
         update_result()
 
     btn = tk.Button(popup, text="Confirm", command=confirm)
-    btn.pack(pady=10)
+    btn.pack(pady=(6, 8))
     btn.bind("<Up>", focus_prev)
     popup.bind('<Return>', confirm)
     popup.bind('<Escape>', cancel_esc)
@@ -1262,6 +1484,21 @@ def apply_theme_styles():
         "TCheckbutton",
         foreground=[("active", COLORS["accent"])],
         background=[("active", COLORS["surface"])],
+    )
+    style.configure(
+        "MultiChoice.TCheckbutton",
+        background=COLORS["surface"],
+        foreground=COLORS["text"],
+        padding=(4, 3),
+    )
+    style.map(
+        "MultiChoice.TCheckbutton",
+        foreground=[("active", COLORS["accent"])],
+        background=[("active", COLORS["surface"])],
+        indicatorcolor=[
+            ("selected", COLORS["accent"]),
+            ("!selected", COLORS["border"]),
+        ],
     )
     style.configure(
         "TLabelframe",
@@ -1407,10 +1644,26 @@ try:
     saved_category_order = saved_customizations.get("category_order")
     saved_option_order = saved_customizations.get("option_order")
     saved_dark_mode = saved_customizations.get("dark_mode", False)
+    saved_option_types = saved_customizations.get("option_types", {})
+    saved_option_choices = saved_customizations.get("option_choices", {})
     if (
         not isinstance(saved_categories, dict)
         or not isinstance(saved_options, dict)
         or not isinstance(saved_dark_mode, bool)
+        or not isinstance(saved_option_types, dict)
+        or any(
+            not isinstance(name, str)
+            or option_type not in ("checkbox", "text", "multi")
+            for name, option_type in saved_option_types.items()
+        )
+        or not isinstance(saved_option_choices, dict)
+        or any(
+            not isinstance(name, str)
+            or not isinstance(choices, list)
+            or any(not isinstance(choice, str) or not choice.strip() for choice in choices)
+            or len({choice.casefold() for choice in choices}) != len(choices)
+            for name, choices in saved_option_choices.items()
+        )
         or not isinstance(saved_category_labels, dict)
         or any(
             not isinstance(old, str)
@@ -1524,6 +1777,29 @@ try:
             loaded_option_names.add(option_name.casefold())
             option_action_names[option_name] = option_name
             used_option_names.add(option_name.casefold())
+    custom_option_names = {
+        option_name
+        for option_names in (*custom_categories.values(), *custom_options.values())
+        for option_name in option_names
+    }
+    if (
+        not set(saved_option_types).issubset(custom_option_names)
+        or not set(saved_option_choices).issubset(custom_option_names)
+        or any(
+            saved_option_types.get(name, "checkbox") != "multi"
+            for name in saved_option_choices
+        )
+        or any(
+            saved_option_types.get(name) == "multi"
+            and not saved_option_choices.get(name)
+            for name in saved_option_types
+        )
+    ):
+        raise ValueError("Customization file contains invalid custom option types or choices.")
+    custom_option_types.update(saved_option_types)
+    custom_option_choices.update(
+        {name: list(choices) for name, choices in saved_option_choices.items()}
+    )
     if saved_category_order is not None:
         if (
             len(saved_category_order) != len(category_options)
@@ -1559,6 +1835,8 @@ except (OSError, json.JSONDecodeError, ValueError) as error:
     custom_options.clear()
     hidden_categories.clear()
     hidden_options.clear()
+    custom_option_types.clear()
+    custom_option_choices.clear()
     category_labels.clear()
     option_labels.clear()
     category_action_names.clear()
@@ -1576,6 +1854,12 @@ except (OSError, json.JSONDecodeError, ValueError) as error:
 
 dark_mode_var.set(dark_mode_enabled)
 apply_theme()
+
+for option_name, option_type in custom_option_types.items():
+    if option_type == "text":
+        custom_text_values[option_name] = tk.StringVar()
+    elif option_type == "multi":
+        custom_multi_selected[option_name] = []
 
 for option_names in category_options.values():
     for name in option_names:
