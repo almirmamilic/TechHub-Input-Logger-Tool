@@ -33,3 +33,13 @@ In a multiple-choice popup, use **Up** and **Down** to move between choices, **S
 | `D` or `→` | Go to the next tab (when a choice popup is not active) |
 
 Use the **Dark Mode** checkbox in **Additional Options** to change the theme. Your theme preference and category and option customizations are saved for the current Windows user.
+
+## Windows executable
+
+The packaged, single-file application is `dist/TechHub Input Logger Tool.exe`. It opens as a GUI application without a command prompt. The app icon is embedded in the executable and bundled for the Tkinter window and taskbar.
+
+To rebuild on Windows, install PyInstaller and run this from the project folder:
+
+```powershell
+pyinstaller --noconfirm "TechHub Input Logger Tool.spec"
+```
