@@ -514,36 +514,6 @@ def add_new_option():
     activate_popup(dialog, name_entry)
 
 
-def show_add_choices(event=None):
-    if event is not None and event.widget.winfo_toplevel() is not root:
-        return
-
-    popup = tk.Toplevel(root)
-    popup.title("Input Logger Tool")
-    popup.geometry("280x90")
-    popup.transient(root)
-
-    def choose(action):
-        popup.destroy()
-        action()
-
-    buttons = tk.Frame(popup)
-    buttons.pack(expand=True)
-    add_category_button = tk.Button(
-        buttons,
-        text="Add New Category",
-        command=lambda: choose(add_new_category),
-    )
-    add_category_button.pack(side="left", padx=5)
-    tk.Button(
-        buttons,
-        text="Add New Option",
-        command=lambda: choose(add_new_option),
-    ).pack(side="left", padx=5)
-    popup.bind("<Escape>", lambda key_event: popup.destroy())
-    activate_popup(popup, add_category_button)
-
-
 def remove_option_state(option_name):
     action_name = option_action_names.pop(option_name, option_name)
     option_widgets.pop(option_name, None)
@@ -775,36 +745,6 @@ def choose_option_to_remove():
     popup.bind("<Return>", confirm)
     popup.bind("<Escape>", lambda event: popup.destroy())
     activate_popup(popup, category_choice)
-
-
-def show_remove_choices(event=None):
-    if event is not None and event.widget.winfo_toplevel() is not root:
-        return
-
-    popup = tk.Toplevel(root)
-    popup.title("Remove")
-    popup.geometry("280x90")
-    popup.transient(root)
-
-    def choose(action):
-        popup.destroy()
-        action()
-
-    buttons = tk.Frame(popup)
-    buttons.pack(expand=True)
-    remove_category_button = tk.Button(
-        buttons,
-        text="Remove Category",
-        command=lambda: choose(choose_category_to_remove),
-    )
-    remove_category_button.pack(side="left", padx=5)
-    tk.Button(
-        buttons,
-        text="Remove Option",
-        command=lambda: choose(choose_option_to_remove),
-    ).pack(side="left", padx=5)
-    popup.bind("<Escape>", lambda key_event: popup.destroy())
-    activate_popup(popup, remove_category_button)
 
 
 def rename_category(category_name, new_name):
@@ -1194,53 +1134,6 @@ def open_reorder_options_dialog():
     popup.bind("<Return>", confirm)
     popup.bind("<Escape>", lambda event: popup.destroy())
     activate_popup(popup, category_choice)
-
-
-def show_organize_choices(event=None):
-    if event is not None and event.widget.winfo_toplevel() is not root:
-        return
-
-    popup = tk.Toplevel(root)
-    popup.title("Input Logger Tool")
-    popup.geometry("300x130")
-    popup.transient(root)
-
-    def choose(action):
-        popup.destroy()
-        action()
-
-    buttons = tk.Frame(popup)
-    buttons.pack(fill="both", expand=True, padx=8, pady=8)
-    buttons.grid_columnconfigure((0, 1), weight=1, uniform="organize")
-    rename_category_button = tk.Button(
-        buttons,
-        text="Rename Category",
-        command=lambda: choose(open_rename_category_dialog),
-    )
-    rename_category_button.grid(row=0, column=0, sticky="ew", padx=4, pady=4)
-    tk.Button(
-        buttons,
-        text="Rename Option",
-        command=lambda: choose(open_rename_option_dialog),
-    ).grid(row=0, column=1, sticky="ew", padx=4, pady=4)
-    tk.Button(
-        buttons,
-        text="Reorder Tabs",
-        command=lambda: choose(
-            lambda: open_reorder_dialog(
-                "Reorder Tabs",
-                list(category_options),
-                reorder_categories,
-            )
-        ),
-    ).grid(row=1, column=0, sticky="ew", padx=4, pady=4)
-    tk.Button(
-        buttons,
-        text="Reorder Options",
-        command=lambda: choose(open_reorder_options_dialog),
-    ).grid(row=1, column=1, sticky="ew", padx=4, pady=4)
-    popup.bind("<Escape>", lambda key_event: popup.destroy())
-    activate_popup(popup, rename_category_button)
 
 
 def toggle_timestamp(event=None):
@@ -2085,11 +1978,6 @@ settings_menu.add_command(
 settings_menu.add_command(label="Reorder Options", command=open_reorder_options_dialog)
 settings_menu.add_separator()
 settings_menu.add_checkbutton(
-    label="Timestamp",
-    variable=all_options["Timestamp"],
-    command=toggle_timestamp,
-)
-settings_menu.add_checkbutton(
     label="Dark Mode",
     variable=dark_mode_var,
     command=toggle_dark_mode,
@@ -2166,12 +2054,6 @@ def refresh_timestamp():
 refresh_timestamp()
 root.bind('<Delete>', lambda e: clear_all())
 root.bind('<Control-c>', copy_to_clipboard)
-root.bind_all("<KeyPress-plus>", show_add_choices)
-root.bind_all("<KP_Add>", show_add_choices)
-root.bind_all("<KeyPress-minus>", show_remove_choices)
-root.bind_all("<KP_Subtract>", show_remove_choices)
-root.bind_all("<KeyPress-asterisk>", show_organize_choices)
-root.bind_all("<KP_Multiply>", show_organize_choices)
 root.bind_all("<KeyPress-grave>", toggle_timestamp)
 root.bind_all("<KeyPress-a>", navigate_tabs)
 root.bind_all("<KeyPress-A>", navigate_tabs)
