@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox, simpledialog, ttk
+from tkinter import font, messagebox, simpledialog, ttk
 from datetime import datetime
 import json
 import sys
@@ -186,6 +186,8 @@ def clear_all():
     loyalty_selected.clear()
     lottery_selected.clear()
     update_result()
+    if "update_timestamp_indicator" in globals():
+        update_timestamp_indicator()
     root.focus_set()
 
 
@@ -1246,6 +1248,8 @@ def toggle_timestamp(event=None):
         return
     all_options["Timestamp"].set(not all_options["Timestamp"].get())
     on_checkbox_toggle("Timestamp")
+    if "update_timestamp_indicator" in globals():
+        update_timestamp_indicator()
     return "break"
 
 
@@ -1578,14 +1582,22 @@ def apply_theme():
             highlightbackground=COLORS["border"],
             highlightcolor=COLORS["accent"],
         )
-    if "settings_bar" in globals():
-        settings_bar.configure(background=COLORS["background"])
+    if "settings_button" in globals():
         settings_button.configure(
+            bg=COLORS["background"],
+            fg=COLORS["muted"],
+            activebackground=COLORS["surface_alt"],
+            activeforeground=COLORS["accent"],
+        )
+    if "settings_menu" in globals():
+        settings_menu.configure(
             bg=COLORS["surface"],
             fg=COLORS["text"],
-            activebackground=COLORS["surface_alt"],
-            activeforeground=COLORS["text"],
+            activebackground=COLORS["accent"],
+            activeforeground="#FFFFFF",
         )
+    if "update_timestamp_indicator" in globals():
+        update_timestamp_indicator()
 
 
 def toggle_dark_mode():
@@ -1598,13 +1610,7 @@ def toggle_dark_mode():
         apply_theme()
 
 options_notebook = ttk.Notebook(root, height=0)
-options_notebook.pack(fill="both", expand=True, padx=16, pady=(8, 8))
-timestamp_frame = ttk.LabelFrame(
-    root,
-    text="  Additional Options  ",
-    padding=(12, 8),
-)
-timestamp_frame.pack(fill="x", padx=16, pady=6)
+options_notebook.pack(fill="both", expand=True, padx=16, pady=(8, 4))
 
 default_category_options = {
     "Crunchtime": ["Bill Of Lading [1]", "Bill Of Lading [2]", "Bill Of Lading [3]", "Veeder Root", "Payout", "Coupon", "Lottery", "Titan Series", "Change Order"],
@@ -1875,38 +1881,190 @@ for name in additional_options:
 for category_name in category_options:
     add_category_tab(category_name)
 
-for name in additional_options:
-    ttk.Checkbutton(
-        timestamp_frame,
-        text=name,
-        variable=all_options[name],
-        command=lambda n=name: on_checkbox_toggle(n),
-    ).pack(side="left")
-ttk.Checkbutton(
-    timestamp_frame,
-    text="Dark Mode",
-    variable=dark_mode_var,
-    command=toggle_dark_mode,
-).pack(side="left", padx=(16, 0))
+available_fonts = set(font.families(root))
+if "Segoe Fluent Icons" in available_fonts:
+    settings_icon_font = ("Segoe Fluent Icons", 11)
+    settings_icon_char = "\uE713"
+    clock_glyph = "\uE823"
+elif "Segoe MDL2 Assets" in available_fonts:
+    settings_icon_font = ("Segoe MDL2 Assets", 11)
+    settings_icon_char = "\uE713"
+    clock_glyph = "\uE823"
+else:
+    settings_icon_font = ("Segoe UI Symbol", 11)
+    settings_icon_char = "⚙"
+    clock_glyph = "⏱"
 
-settings_bar = tk.Frame(root, background=COLORS["background"])
-settings_bar.pack(fill="x", padx=16, pady=(10, 0), before=options_notebook)
 settings_button = tk.Button(
-    settings_bar,
-    text="⚙",
-    font=("Segoe UI Symbol", 12),
+    root,
+    text=settings_icon_char,
+    font=settings_icon_font,
     bd=0,
-    padx=8,
-    pady=2,
-    bg=COLORS["surface"],
-    fg=COLORS["text"],
+    relief="flat",
+    highlightthickness=0,
+    padx=6,
+    pady=1,
+    bg=COLORS["background"],
+    fg=COLORS["muted"],
     activebackground=COLORS["surface_alt"],
-    activeforeground=COLORS["text"],
+    activeforeground=COLORS["accent"],
     cursor="hand2",
 )
-settings_button.pack(side="right")
 
-settings_menu = tk.Menu(root, tearoff=0)
+timestamp_button = tk.Button(
+    root,
+    text=f"{clock_glyph} OFF",
+    font=("Segoe UI", 8, "bold"),
+    bd=0,
+    relief="flat",
+    highlightthickness=0,
+    padx=5,
+    pady=1,
+    bg=COLORS["background"],
+    fg=COLORS["muted"],
+    activebackground=COLORS["surface_alt"],
+    activeforeground=COLORS["accent"],
+    cursor="hand2",
+    command=toggle_timestamp,
+)
+
+
+def update_timestamp_indicator():
+    if "timestamp_button" not in globals():
+        return
+    is_on = all_options["Timestamp"].get()
+    if is_on:
+        timestamp_button.configure(
+            text=f"{clock_glyph} ON",
+            fg=COLORS["accent"],
+            bg=COLORS["surface_alt"],
+        )
+    else:
+        timestamp_button.configure(
+            text=f"{clock_glyph} OFF",
+            fg=COLORS["muted"],
+            bg=COLORS["background"],
+        )
+
+
+def on_timestamp_enter(event=None):
+    is_on = all_options["Timestamp"].get()
+    if is_on:
+        timestamp_button.configure(bg=COLORS["surface_alt"], fg=COLORS["accent_active"])
+    else:
+        timestamp_button.configure(bg=COLORS["surface_alt"], fg=COLORS["text"])
+
+
+def on_timestamp_leave(event=None):
+    update_timestamp_indicator()
+
+
+timestamp_button.bind("<Enter>", on_timestamp_enter)
+timestamp_button.bind("<Leave>", on_timestamp_leave)
+update_timestamp_indicator()
+
+
+def on_settings_enter(event=None):
+    settings_button.configure(bg=COLORS["surface_alt"], fg=COLORS["accent"])
+
+
+def on_settings_leave(event=None):
+    settings_button.configure(bg=COLORS["background"], fg=COLORS["muted"])
+
+
+settings_button.bind("<Enter>", on_settings_enter)
+settings_button.bind("<Leave>", on_settings_leave)
+
+
+class ToolTip:
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tip_window = None
+        self._after_id = None
+        self.widget.bind("<Enter>", self.schedule_tip, add="+")
+        self.widget.bind("<Leave>", self.hide_tip, add="+")
+        self.widget.bind("<Button-1>", self.hide_tip, add="+")
+
+    def schedule_tip(self, event=None):
+        self.cancel_tip()
+        self._after_id = self.widget.after(400, self.show_tip)
+
+    def cancel_tip(self):
+        if self._after_id:
+            self.widget.after_cancel(self._after_id)
+            self._after_id = None
+
+    def show_tip(self):
+        if self.tip_window or not self.text:
+            return
+        x = self.widget.winfo_rootx() + (self.widget.winfo_width() // 2) - 24
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 4
+        self.tip_window = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(True)
+        tw.wm_geometry(f"+{x}+{y}")
+        lbl = tk.Label(
+            tw,
+            text=self.text,
+            background=COLORS["surface"],
+            foreground=COLORS["text"],
+            relief="solid",
+            borderwidth=1,
+            font=("Segoe UI", 8),
+            padx=5,
+            pady=2,
+        )
+        lbl.pack()
+
+    def hide_tip(self, event=None):
+        self.cancel_tip()
+        if self.tip_window:
+            self.tip_window.destroy()
+            self.tip_window = None
+
+
+settings_tooltip = ToolTip(settings_button, "Settings")
+timestamp_tooltip = ToolTip(timestamp_button, "Timestamp (Click or press ` to toggle)")
+
+
+def place_settings_button(event=None):
+    if not options_notebook.winfo_ismapped():
+        return
+    btn_w = settings_button.winfo_reqwidth()
+    btn_h = settings_button.winfo_reqheight()
+    nb_x = options_notebook.winfo_x()
+    nb_w = options_notebook.winfo_width()
+    nb_y = options_notebook.winfo_y()
+    tab_height = 27
+    y_pos = nb_y + max(1, (tab_height - btn_h) // 2)
+    settings_x = nb_x + nb_w - btn_w - 4
+    settings_button.place(
+        x=settings_x,
+        y=y_pos,
+    )
+    if "timestamp_button" in globals():
+        ts_w = timestamp_button.winfo_reqwidth()
+        ts_h = timestamp_button.winfo_reqheight()
+        ts_y = nb_y + max(1, (tab_height - ts_h) // 2)
+        timestamp_button.place(
+            x=settings_x - ts_w - 6,
+            y=ts_y,
+        )
+
+
+place_settings_button()
+root.after_idle(place_settings_button)
+root.bind("<Configure>", place_settings_button)
+options_notebook.bind("<Configure>", place_settings_button)
+
+settings_menu = tk.Menu(
+    root,
+    tearoff=0,
+    bg=COLORS["surface"],
+    fg=COLORS["text"],
+    activebackground=COLORS["accent"],
+    activeforeground="#FFFFFF",
+)
 settings_menu.add_command(label="Add Category", command=add_new_category)
 settings_menu.add_command(label="Add Option", command=add_new_option)
 settings_menu.add_separator()
@@ -1927,23 +2085,40 @@ settings_menu.add_command(
 settings_menu.add_command(label="Reorder Options", command=open_reorder_options_dialog)
 settings_menu.add_separator()
 settings_menu.add_checkbutton(
+    label="Timestamp",
+    variable=all_options["Timestamp"],
+    command=toggle_timestamp,
+)
+settings_menu.add_checkbutton(
     label="Dark Mode",
     variable=dark_mode_var,
     command=toggle_dark_mode,
 )
 
 
-def open_settings_menu(event):
-    settings_menu.tk_popup(
-        event.x_root,
-        event.y_root + settings_button.winfo_height(),
-    )
+def open_settings_menu(event=None):
+    if "settings_tooltip" in globals():
+        settings_tooltip.hide_tip()
+    try:
+        menu_w = settings_menu.winfo_reqwidth()
+        btn_x = settings_button.winfo_rootx()
+        btn_w = settings_button.winfo_width()
+        btn_y = settings_button.winfo_rooty()
+        btn_h = settings_button.winfo_height()
+        x = btn_x + btn_w - menu_w
+        if x < btn_x:
+            x = btn_x
+        y = btn_y + btn_h + 2
+        settings_menu.tk_popup(x, y)
+    finally:
+        settings_menu.grab_release()
 
 
-settings_button.bind("<Button-1>", open_settings_menu)
+settings_button.configure(command=open_settings_menu)
+settings_button.bind("<Button-1>", lambda e: open_settings_menu())
 
 result_frame = tk.Frame(root, background=COLORS["background"])
-result_frame.pack(fill="x", padx=16, pady=(8, 12))
+result_frame.pack(fill="x", padx=16, pady=(4, 12))
 result = tk.Text(
     result_frame,
     height=4,
