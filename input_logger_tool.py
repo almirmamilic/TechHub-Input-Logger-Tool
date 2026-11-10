@@ -110,10 +110,20 @@ def update_result():
     selected = []
     timestamp_str = ""
 
-    for name in click_order:
+    ordered_names = [
+        name
+        for option_names in category_options.values()
+        for name in option_names
+        if name in click_order
+    ]
+    ordered_names += [
+        name for name in additional_options if name in click_order
+    ]
+
+    for name in ordered_names:
         if name == "Timestamp":
             now = datetime.now().strftime("%m/%d/%Y")
-            timestamp_str = f" -{agent_name} {now}"
+            timestamp_str = f" - {agent_name}(DE) {now}"
             continue
             
         # Reverted Logic for NCR, NPR, Loyalty
@@ -160,7 +170,9 @@ def update_result():
             selected.append(name)
 
     final_text = ", ".join(selected) + timestamp_str
-    
+    if timestamp_str:
+        final_text = "Data Entered: " + final_text.lstrip()
+
     result.config(state="normal")
     result.delete("1.0", tk.END)
     result.insert(tk.END, final_text.strip())
@@ -1264,31 +1276,66 @@ def open_custom_text_popup(option_name):
 def open_multi_checkbox_popup(name, options_list, selected_list):
     popup = tk.Toplevel(root)
     popup.title(f"Select {name}")
-    popup.geometry(f"250x{min(240, max(125, 70 + len(options_list) * 28))}")
+    popup.configure(background=COLORS["background"])
     popup.transient(root)
+    popup.resizable(False, False)
+
+    container = tk.Frame(popup, background=COLORS["background"], padx=18, pady=16)
+    container.pack(fill="both", expand=True)
+
+    header = tk.Label(
+        container,
+        text=f"Select {name}",
+        font=("Segoe UI", 10, "bold"),
+        background=COLORS["background"],
+        foreground=COLORS["text"],
+    )
+    header.pack(anchor="w", pady=(0, 2))
+
+    sub = tk.Label(
+        container,
+        text="Choose all that apply:",
+        font=("Segoe UI", 8),
+        background=COLORS["background"],
+        foreground=COLORS["muted"],
+    )
+    sub.pack(anchor="w", pady=(0, 8))
+
+    card = tk.Frame(
+        container,
+        background=COLORS["surface"],
+        highlightbackground=COLORS["border"],
+        highlightthickness=1,
+        padx=12,
+        pady=8,
+    )
+    card.pack(fill="both", expand=True, pady=(0, 14))
+
     vars, widgets = [], []
     for opt in options_list:
         var = tk.BooleanVar(value=(opt in selected_list))
         cb = ttk.Checkbutton(
-            popup,
+            card,
             text=opt,
             variable=var,
             style="MultiChoice.TCheckbutton",
         )
-        cb.pack(anchor="w", padx=12, pady=1)
+        cb.pack(anchor="w", fill="x", pady=2)
         vars.append((opt, var))
         widgets.append(cb)
 
-    def confirm():
+    def confirm(event=None):
         selected_list.clear()
         for opt, var in vars:
-            if var.get(): selected_list.append(opt)
+            if var.get():
+                selected_list.append(opt)
         popup.destroy()
         update_result()
 
     def cancel_esc(event=None):
         all_options[name].set(False)
-        if name in click_order: click_order.remove(name)
+        if name in click_order:
+            click_order.remove(name)
         selected_list.clear()
         popup.destroy()
         update_result()
@@ -1303,18 +1350,58 @@ def open_multi_checkbox_popup(name, options_list, selected_list):
             (i for i, cb in enumerate(widgets) if cb is focused),
             -1,
         )
-        direction = -1 if event.keysym.lower() == "w" else 1
+        direction = -1 if event.keysym.lower() in ("w", "up") else 1
         widgets[(current + direction) % len(widgets)].focus_set()
         return "break"
 
-    for key in ("<KeyPress-w>", "<KeyPress-W>", "<KeyPress-s>", "<KeyPress-S>"):
-        popup.bind(key, navigate_choices)
+    def set_focused_value(val):
+        focused = popup.focus_get()
+        idx = next((i for i, cb in enumerate(widgets) if cb is focused), -1)
+        if idx != -1:
+            vars[idx][1].set(val)
+        return "break"
 
-    btn = tk.Button(popup, text="Confirm", command=confirm)
-    btn.pack(pady=(6, 8))
-    popup.bind('<Return>', lambda event: confirm())
-    popup.bind('<Escape>', cancel_esc)
-    activate_popup(popup, widgets[0] if widgets else btn)
+    for key in (
+        "<KeyPress-w>",
+        "<KeyPress-W>",
+        "<KeyPress-s>",
+        "<KeyPress-S>",
+        "<Up>",
+        "<Down>",
+    ):
+        popup.bind(key, navigate_choices)
+    popup.bind("<Left>", lambda e: set_focused_value(False))
+    popup.bind("<Right>", lambda e: set_focused_value(True))
+
+    btn_row = tk.Frame(container, background=COLORS["background"])
+    btn_row.pack(fill="x")
+
+    confirm_btn = ttk.Button(
+        btn_row,
+        text="Confirm",
+        style="Accent.TButton",
+        width=10,
+        command=confirm,
+    )
+    confirm_btn.pack(side="right")
+
+    cancel_btn = ttk.Button(
+        btn_row,
+        text="Cancel",
+        width=10,
+        command=cancel_esc,
+    )
+    cancel_btn.pack(side="right", padx=(0, 8))
+
+    popup.bind("<Return>", confirm)
+    popup.bind("<Escape>", cancel_esc)
+
+    popup.update_idletasks()
+    req_w = max(240, popup.winfo_reqwidth())
+    req_h = popup.winfo_reqheight()
+    popup.geometry(f"{req_w}x{req_h}")
+
+    activate_popup(popup, widgets[0] if widgets else confirm_btn)
 
 # ---------------------------
 # UI Construction
@@ -1569,6 +1656,7 @@ customization_path = os.path.join(
     "TechHub Input Logger Tool",
     "customizations.json",
 )
+agent_name_configured = False
 try:
     with open(customization_path, "r", encoding="utf-8") as config_file:
         saved_customizations = json.load(config_file)
@@ -1766,6 +1854,7 @@ try:
     dark_mode_enabled = saved_dark_mode
     if isinstance(saved_agent_name, str) and saved_agent_name.strip():
         agent_name = saved_agent_name.strip()
+        agent_name_configured = True
 except FileNotFoundError:
     pass
 except (OSError, json.JSONDecodeError, ValueError) as error:
@@ -2130,4 +2219,17 @@ root.bind_all("<KeyPress-s>", navigate_options)
 root.bind_all("<KeyPress-S>", navigate_options)
 root.update_idletasks()
 root.minsize(btn_frame.winfo_reqwidth() + 32, root.winfo_reqheight())
+
+if not agent_name_configured:
+    startup_name = simpledialog.askstring(
+        "Welcome",
+        "Enter your agent name:",
+        initialvalue=agent_name,
+        parent=root,
+    )
+    if startup_name is not None and startup_name.strip():
+        agent_name = startup_name.strip()
+    save_customizations(custom_categories, custom_options)
+    update_result()
+
 root.mainloop()
