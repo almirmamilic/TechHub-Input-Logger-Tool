@@ -1578,6 +1578,14 @@ def apply_theme():
             highlightbackground=COLORS["border"],
             highlightcolor=COLORS["accent"],
         )
+    if "settings_bar" in globals():
+        settings_bar.configure(background=COLORS["background"])
+        settings_button.configure(
+            bg=COLORS["surface"],
+            fg=COLORS["text"],
+            activebackground=COLORS["surface_alt"],
+            activeforeground=COLORS["text"],
+        )
 
 
 def toggle_dark_mode():
@@ -1880,6 +1888,59 @@ ttk.Checkbutton(
     variable=dark_mode_var,
     command=toggle_dark_mode,
 ).pack(side="left", padx=(16, 0))
+
+settings_bar = tk.Frame(root, background=COLORS["background"])
+settings_bar.pack(fill="x", padx=16, pady=(10, 0), before=options_notebook)
+settings_button = tk.Button(
+    settings_bar,
+    text="⚙",
+    font=("Segoe UI Symbol", 12),
+    bd=0,
+    padx=8,
+    pady=2,
+    bg=COLORS["surface"],
+    fg=COLORS["text"],
+    activebackground=COLORS["surface_alt"],
+    activeforeground=COLORS["text"],
+    cursor="hand2",
+)
+settings_button.pack(side="right")
+
+settings_menu = tk.Menu(root, tearoff=0)
+settings_menu.add_command(label="Add Category", command=add_new_category)
+settings_menu.add_command(label="Add Option", command=add_new_option)
+settings_menu.add_separator()
+settings_menu.add_command(label="Remove Category", command=choose_category_to_remove)
+settings_menu.add_command(label="Remove Option", command=choose_option_to_remove)
+settings_menu.add_separator()
+settings_menu.add_command(label="Rename Category", command=open_rename_category_dialog)
+settings_menu.add_command(label="Rename Option", command=open_rename_option_dialog)
+settings_menu.add_separator()
+settings_menu.add_command(
+    label="Reorder Tabs",
+    command=lambda: open_reorder_dialog(
+        "Reorder Tabs",
+        list(category_options),
+        reorder_categories,
+    ),
+)
+settings_menu.add_command(label="Reorder Options", command=open_reorder_options_dialog)
+settings_menu.add_separator()
+settings_menu.add_checkbutton(
+    label="Dark Mode",
+    variable=dark_mode_var,
+    command=toggle_dark_mode,
+)
+
+
+def open_settings_menu(event):
+    settings_menu.tk_popup(
+        event.x_root,
+        event.y_root + settings_button.winfo_height(),
+    )
+
+
+settings_button.bind("<Button-1>", open_settings_menu)
 
 result_frame = tk.Frame(root, background=COLORS["background"])
 result_frame.pack(fill="x", padx=16, pady=(8, 12))
