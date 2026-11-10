@@ -1164,6 +1164,45 @@ def navigate_tabs(event):
     return "break"
 
 
+def navigate_options(event):
+    if event.widget.winfo_toplevel() is not root:
+        return
+    if event.widget.winfo_class() in ("Entry", "Text", "TEntry", "TCombobox"):
+        return
+
+    tab = options_notebook.select()
+    if not tab:
+        return "break"
+    tab_text = options_notebook.tab(tab, "text")
+    category_name = next(
+        (
+            name
+            for name in category_options
+            if name == tab_text or category_labels.get(name, name) == tab_text
+        ),
+        None,
+    )
+    if category_name is None:
+        return "break"
+    names = [
+        name
+        for name in category_options[category_name]
+        if name in option_widgets
+    ]
+    if not names:
+        return "break"
+
+    focused = root.focus_get()
+    current = next(
+        (i for i, name in enumerate(names) if option_widgets[name] is focused),
+        -1,
+    )
+    direction = -1 if event.keysym.lower() == "w" else 1
+    index = (current + direction) % len(names)
+    option_widgets[names[index]].focus_set()
+    return "break"
+
+
 # ---------------------------
 # Popups Logic
 # ---------------------------
@@ -1238,28 +1277,7 @@ def open_multi_checkbox_popup(name, options_list, selected_list):
         vars.append((opt, var))
         widgets.append(cb)
 
-    def focus_next(event): event.widget.tk_focusNext().focus(); return "break"
-    def focus_prev(event): event.widget.tk_focusPrev().focus(); return "break"
-    def toggle_space(event): event.widget.toggle(); return "break"
-
-    def set_choice(event, choice_var, selected):
-        choice_var.set(selected)
-        return "break"
-
-    for cb, (_, choice_var) in zip(widgets, vars):
-        cb.bind("<Down>", focus_next)
-        cb.bind("<Up>", focus_prev)
-        cb.bind("<space>", toggle_space)
-        cb.bind(
-            "<Left>",
-            lambda event, var=choice_var: set_choice(event, var, True),
-        )
-        cb.bind(
-            "<Right>",
-            lambda event, var=choice_var: set_choice(event, var, False),
-        )
-
-    def confirm(event=None):
+    def confirm():
         selected_list.clear()
         for opt, var in vars:
             if var.get(): selected_list.append(opt)
@@ -1273,10 +1291,26 @@ def open_multi_checkbox_popup(name, options_list, selected_list):
         popup.destroy()
         update_result()
 
+    def navigate_choices(event):
+        if not widgets:
+            return "break"
+        if event.widget.winfo_class() in ("Entry", "Text", "TEntry", "TCombobox"):
+            return
+        focused = popup.focus_get()
+        current = next(
+            (i for i, cb in enumerate(widgets) if cb is focused),
+            -1,
+        )
+        direction = -1 if event.keysym.lower() == "w" else 1
+        widgets[(current + direction) % len(widgets)].focus_set()
+        return "break"
+
+    for key in ("<KeyPress-w>", "<KeyPress-W>", "<KeyPress-s>", "<KeyPress-S>"):
+        popup.bind(key, navigate_choices)
+
     btn = tk.Button(popup, text="Confirm", command=confirm)
     btn.pack(pady=(6, 8))
-    btn.bind("<Up>", focus_prev)
-    popup.bind('<Return>', confirm)
+    popup.bind('<Return>', lambda event: confirm())
     popup.bind('<Escape>', cancel_esc)
     activate_popup(popup, widgets[0] if widgets else btn)
 
@@ -2061,6 +2095,10 @@ root.bind_all("<KeyPress-d>", navigate_tabs)
 root.bind_all("<KeyPress-D>", navigate_tabs)
 root.bind_all("<Left>", navigate_tabs)
 root.bind_all("<Right>", navigate_tabs)
+root.bind_all("<KeyPress-w>", navigate_options)
+root.bind_all("<KeyPress-W>", navigate_options)
+root.bind_all("<KeyPress-s>", navigate_options)
+root.bind_all("<KeyPress-S>", navigate_options)
 root.update_idletasks()
 root.minsize(btn_frame.winfo_reqwidth() + 32, root.winfo_reqheight())
 root.mainloop()
