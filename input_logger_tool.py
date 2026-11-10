@@ -46,6 +46,7 @@ custom_option_types = {}
 custom_option_choices = {}
 custom_text_values = {}
 custom_multi_selected = {}
+agent_name = "Unknown"
 
 # ---------------------------
 # Functions
@@ -112,7 +113,7 @@ def update_result():
     for name in click_order:
         if name == "Timestamp":
             now = datetime.now().strftime("%m/%d/%Y")
-            timestamp_str = f" -Ric(DE) {now}"
+            timestamp_str = f" -{agent_name} {now}"
             continue
             
         # Reverted Logic for NCR, NPR, Loyalty
@@ -254,6 +255,7 @@ def save_customizations(
                     if saved_option_order is None
                     else saved_option_order,
                     "dark_mode": dark_mode_enabled,
+                    "agent_name": agent_name,
                     "option_types": (
                         custom_option_types
                         if saved_option_types is None
@@ -1582,6 +1584,7 @@ try:
     saved_category_order = saved_customizations.get("category_order")
     saved_option_order = saved_customizations.get("option_order")
     saved_dark_mode = saved_customizations.get("dark_mode", False)
+    saved_agent_name = saved_customizations.get("agent_name", "Unknown")
     saved_option_types = saved_customizations.get("option_types", {})
     saved_option_choices = saved_customizations.get("option_choices", {})
     if (
@@ -1761,6 +1764,8 @@ try:
                 raise ValueError("Customization file contains an invalid option order.")
             category_options[category_name] = list(saved_order)
     dark_mode_enabled = saved_dark_mode
+    if isinstance(saved_agent_name, str) and saved_agent_name.strip():
+        agent_name = saved_agent_name.strip()
 except FileNotFoundError:
     pass
 except (OSError, json.JSONDecodeError, ValueError) as error:
@@ -1984,6 +1989,28 @@ root.after_idle(place_settings_button)
 root.bind("<Configure>", place_settings_button)
 options_notebook.bind("<Configure>", place_settings_button)
 
+def change_agent_name():
+    global agent_name
+    new_name = simpledialog.askstring(
+        "Agent Name",
+        "Enter the agent name:",
+        initialvalue=agent_name,
+        parent=root,
+    )
+    if new_name is None:
+        return
+    new_name = new_name.strip()
+    if not new_name:
+        messagebox.showwarning("Invalid Name", "Agent name cannot be empty.", parent=root)
+        return
+    previous_name = agent_name
+    agent_name = new_name
+    if not save_customizations(custom_categories, custom_options):
+        agent_name = previous_name
+        return
+    update_result()
+
+
 settings_menu = tk.Menu(
     root,
     tearoff=0,
@@ -2010,6 +2037,8 @@ settings_menu.add_command(
     ),
 )
 settings_menu.add_command(label="Reorder Options", command=open_reorder_options_dialog)
+settings_menu.add_separator()
+settings_menu.add_command(label="Agent Name...", command=change_agent_name)
 settings_menu.add_separator()
 settings_menu.add_checkbutton(
     label="Dark Mode",
