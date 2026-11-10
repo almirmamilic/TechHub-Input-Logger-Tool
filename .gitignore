@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Python virtual environments
 .venv/
 venv/
@@ -15,3 +16,7 @@ dist/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+=======
+/build/
+/dist/
+>>>>>>> aa57f401a81e3673b6502049627064177ea19805
