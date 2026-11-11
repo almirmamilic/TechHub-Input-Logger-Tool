@@ -64,46 +64,49 @@ def on_checkbox_toggle(name):
         if name in click_order:
             click_order.remove(name)
     
-    if action_name == "Bill Of Lading [1]":
-        if all_options[name].get(): open_bol_popup(name, bol1_value)
-    elif action_name == "Bill Of Lading [2]":
-        if all_options[name].get(): open_bol_popup(name, bol2_value)
-    elif action_name == "Bill Of Lading [3]":
-        if all_options[name].get(): open_bol_popup(name, bol3_value)
-    elif action_name == "NCR":
-        if all_options[name].get():
-            open_multi_checkbox_popup(name, ["Fleetwide", "Fuelman", "PumpPass", "ExxonMobilG", "Shell"], ncr_selected)
-        else:
-            ncr_selected.clear()
-    elif action_name == "NPR":
-        if all_options[name].get():
-            open_multi_checkbox_popup(name, ["E-85", "Diesel", "Racingfuel", "Kerosene"], npr_selected)
-        else:
-            npr_selected.clear()
-    elif action_name == "Loyalty":
-        if all_options[name].get():
-            open_multi_checkbox_popup(name, ["600", "888", "800", "211"], loyalty_selected)
-        else:
-            loyalty_selected.clear()
-    elif action_name == "Lottery":
-        if all_options[name].get():
-            open_multi_checkbox_popup(name, ["FL Lottery", "IN Lottery", "IL Lottery"], lottery_selected)
-        else:
-            lottery_selected.clear()
-    elif name in custom_option_types:
-        option_type = custom_option_types[name]
-        if all_options[name].get() and option_type == "text":
+    custom_type = custom_option_types.get(name)
+
+    if name not in custom_option_types:
+        if action_name == "Bill Of Lading [1]":
+            if all_options[name].get(): open_bol_popup(name, bol1_value)
+        elif action_name == "Bill Of Lading [2]":
+            if all_options[name].get(): open_bol_popup(name, bol2_value)
+        elif action_name == "Bill Of Lading [3]":
+            if all_options[name].get(): open_bol_popup(name, bol3_value)
+        elif action_name == "NCR":
+            if all_options[name].get():
+                open_multi_checkbox_popup(name, ["Fleetwide", "Fuelman", "PumpPass", "ExxonMobilG", "Shell"], ncr_selected)
+            else:
+                ncr_selected.clear()
+        elif action_name == "NPR":
+            if all_options[name].get():
+                open_multi_checkbox_popup(name, ["E-85", "Diesel", "Racingfuel", "Kerosene"], npr_selected)
+            else:
+                npr_selected.clear()
+        elif action_name == "Loyalty":
+            if all_options[name].get():
+                open_multi_checkbox_popup(name, ["600", "888", "800", "211"], loyalty_selected)
+            else:
+                loyalty_selected.clear()
+        elif action_name == "Lottery":
+            if all_options[name].get():
+                open_multi_checkbox_popup(name, ["FL Lottery", "IN Lottery", "IL Lottery"], lottery_selected)
+            else:
+                lottery_selected.clear()
+
+    if custom_type in ("text", "multi"):
+        if all_options[name].get() and custom_type == "text":
             open_custom_text_popup(name)
-        elif all_options[name].get() and option_type == "multi":
+        elif all_options[name].get() and custom_type == "multi":
             open_multi_checkbox_popup(
                 name,
                 custom_option_choices[name],
                 custom_multi_selected.setdefault(name, []),
             )
         elif not all_options[name].get():
-            if option_type == "text":
+            if custom_type == "text":
                 custom_text_values[name].set("")
-            elif option_type == "multi":
+            elif custom_type == "multi":
                 custom_multi_selected[name].clear()
             
     update_result()
@@ -136,6 +139,8 @@ def update_result():
         elif custom_type == "multi" and name in custom_multi_selected:
             choices = custom_multi_selected[name]
             selected.append(f"{name}({', '.join(choices)})" if choices else name)
+        elif name in custom_option_types and custom_type == "checkbox":
+            selected.append(name)
         elif action_name == "NCR":
             if ncr_selected:
                 selected.append(f"{name}({', '.join(ncr_selected)})")
@@ -2105,7 +2110,7 @@ timestamp_tooltip = ToolTip(timestamp_button, "Timestamp (Click or press ` to to
 
 credit_label = tk.Label(
     root,
-    text="Credited to Maal",
+    text=agent_name,
     font=("Segoe UI", 8),
     foreground=COLORS["muted"],
     background=COLORS["surface"],
@@ -2208,6 +2213,8 @@ def change_agent_name():
         agent_name = previous_name
         return
     update_result()
+    if "credit_label" in globals():
+        credit_label.configure(text=agent_name)
 
 
 def current_option_selection():
@@ -2485,6 +2492,7 @@ if not agent_name_configured:
     startup_name = ask_agent_name()
     if startup_name is not None:
         agent_name = startup_name
+        credit_label.configure(text=agent_name)
     save_customizations(custom_categories, custom_options)
     update_result()
 
