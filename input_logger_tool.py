@@ -2078,7 +2078,7 @@ def place_settings_button(event=None):
     nb_w = options_notebook.winfo_width()
     nb_y = options_notebook.winfo_y()
     tab_height = 27
-    y_pos = nb_y + max(1, (tab_height - btn_h) // 2)
+    y_pos = nb_y + tab_height + 4
     settings_x = nb_x + nb_w - btn_w - 4
     settings_button.place(
         x=settings_x,
@@ -2087,7 +2087,7 @@ def place_settings_button(event=None):
     if "timestamp_button" in globals():
         ts_w = timestamp_button.winfo_reqwidth()
         ts_h = timestamp_button.winfo_reqheight()
-        ts_y = nb_y + max(1, (tab_height - ts_h) // 2)
+        ts_y = nb_y + tab_height + 4
         timestamp_button.place(
             x=settings_x - ts_w - 6,
             y=ts_y,
