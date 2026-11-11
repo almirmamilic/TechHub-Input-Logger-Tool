@@ -199,6 +199,9 @@ def clear_all():
     loyalty_selected.clear()
     lottery_selected.clear()
     update_result()
+    tabs = options_notebook.tabs()
+    if tabs:
+        options_notebook.select(tabs[0])
     if "update_timestamp_indicator" in globals():
         update_timestamp_indicator()
     root.focus_set()
