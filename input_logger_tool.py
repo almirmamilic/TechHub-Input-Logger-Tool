@@ -2220,32 +2220,26 @@ def current_option_selection():
 
 
 def apply_preset(option_names):
-    valid = {
+    preset_set = {
         name
         for names in category_options.values()
         for name in names
     } & set(option_names)
-    for value in custom_text_values.values():
-        value.set("")
-    for selected in custom_multi_selected.values():
-        selected.clear()
-    bol1_value.set("")
-    bol2_value.set("")
-    bol3_value.set("")
-    ncr_selected.clear()
-    npr_selected.clear()
-    loyalty_selected.clear()
-    lottery_selected.clear()
-    timestamp_was = "Timestamp" in click_order
+    combined = preset_set | {
+        name
+        for name, var in all_options.items()
+        if name != "Timestamp" and var.get()
+    }
     for name, var in all_options.items():
         if name != "Timestamp":
-            var.set(name in valid)
+            var.set(name in combined)
+    timestamp_was = "Timestamp" in click_order
     click_order.clear()
     click_order.extend(
         name
         for option_names in category_options.values()
         for name in option_names
-        if name in valid
+        if name in combined
     )
     if timestamp_was:
         click_order.append("Timestamp")
