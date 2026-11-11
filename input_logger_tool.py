@@ -35,6 +35,7 @@ DARK_COLORS = {
 }
 COLORS = dict(LIGHT_COLORS)
 dark_mode_enabled = False
+always_on_top = False
 
 # ---------------------------
 # State Management
@@ -271,6 +272,7 @@ def save_customizations(
                     if saved_option_order is None
                     else saved_option_order,
                     "dark_mode": dark_mode_enabled,
+                    "always_on_top": always_on_top,
                     "agent_name": agent_name,
                     "window_size": (
                         f"{root.winfo_width()}x{root.winfo_height()}"
@@ -1645,6 +1647,16 @@ def toggle_dark_mode():
         dark_mode_var.set(dark_mode_enabled)
         apply_theme()
 
+
+def toggle_always_on_top():
+    global always_on_top
+    always_on_top = always_on_top_var.get()
+    root.attributes("-topmost", always_on_top)
+    if not save_customizations(custom_categories, custom_options):
+        always_on_top = not always_on_top
+        always_on_top_var.set(always_on_top)
+        root.attributes("-topmost", always_on_top)
+
 options_notebook = ttk.Notebook(root, height=0)
 options_notebook.pack(fill="both", expand=True, padx=16, pady=(8, 4))
 
@@ -1662,6 +1674,7 @@ additional_options = ["Timestamp"]
 
 all_options = {}
 dark_mode_var = tk.BooleanVar(value=dark_mode_enabled)
+always_on_top_var = tk.BooleanVar(value=always_on_top)
 bol1_value, bol2_value, bol3_value = tk.StringVar(), tk.StringVar(), tk.StringVar()
 ncr_selected, npr_selected, loyalty_selected, lottery_selected = [], [], [], []
 category_frames = {}
@@ -1695,6 +1708,7 @@ try:
     saved_category_order = saved_customizations.get("category_order")
     saved_option_order = saved_customizations.get("option_order")
     saved_dark_mode = saved_customizations.get("dark_mode", False)
+    saved_always_on_top = saved_customizations.get("always_on_top", False)
     saved_agent_name = saved_customizations.get("agent_name", "Unknown")
     saved_window_size = saved_customizations.get("window_size")
     saved_presets = saved_customizations.get("presets", {})
@@ -1704,6 +1718,7 @@ try:
         not isinstance(saved_categories, dict)
         or not isinstance(saved_options, dict)
         or not isinstance(saved_dark_mode, bool)
+        or not isinstance(saved_always_on_top, bool)
         or not isinstance(saved_option_types, dict)
         or any(
             not isinstance(name, str)
@@ -1878,6 +1893,7 @@ try:
                 raise ValueError("Customization file contains an invalid option order.")
             category_options[category_name] = list(saved_order)
     dark_mode_enabled = saved_dark_mode
+    always_on_top = saved_always_on_top
     if isinstance(saved_agent_name, str) and saved_agent_name.strip():
         agent_name = saved_agent_name.strip()
         agent_name_configured = True
@@ -1923,6 +1939,8 @@ except (OSError, json.JSONDecodeError, ValueError) as error:
         option_action_names.update({name: name for name in option_names})
 
 dark_mode_var.set(dark_mode_enabled)
+always_on_top_var.set(always_on_top)
+root.attributes("-topmost", always_on_top)
 apply_theme()
 
 for option_name, option_type in custom_option_types.items():
@@ -2376,6 +2394,11 @@ settings_menu.add_checkbutton(
     label="Dark Mode",
     variable=dark_mode_var,
     command=toggle_dark_mode,
+)
+settings_menu.add_checkbutton(
+    label="Always on Top",
+    variable=always_on_top_var,
+    command=toggle_always_on_top,
 )
 
 
