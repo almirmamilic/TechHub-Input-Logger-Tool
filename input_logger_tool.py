@@ -47,6 +47,7 @@ custom_option_choices = {}
 custom_text_values = {}
 custom_multi_selected = {}
 agent_name = "Unknown"
+presets = {}
 
 # ---------------------------
 # Functions
@@ -276,6 +277,7 @@ def save_customizations(
                         if "root" in globals() and root.winfo_ismapped()
                         else None
                     ),
+                    "presets": presets,
                     "option_types": (
                         custom_option_types
                         if saved_option_types is None
@@ -1695,6 +1697,7 @@ try:
     saved_dark_mode = saved_customizations.get("dark_mode", False)
     saved_agent_name = saved_customizations.get("agent_name", "Unknown")
     saved_window_size = saved_customizations.get("window_size")
+    saved_presets = saved_customizations.get("presets", {})
     saved_option_types = saved_customizations.get("option_types", {})
     saved_option_choices = saved_customizations.get("option_choices", {})
     if (
@@ -1882,6 +1885,14 @@ try:
         width, _, height = saved_window_size.partition("x")
         if width.isdigit() and height.isdigit():
             pending_window_size = f"{width}x{height}"
+    if isinstance(saved_presets, dict):
+        for preset_key, preset_names in saved_presets.items():
+            if (
+                isinstance(preset_key, str)
+                and isinstance(preset_names, list)
+                and all(isinstance(n, str) for n in preset_names)
+            ):
+                presets[preset_key] = list(preset_names)
 except FileNotFoundError:
     pass
 except (OSError, json.JSONDecodeError, ValueError) as error:
@@ -2181,6 +2192,156 @@ def change_agent_name():
     update_result()
 
 
+def current_option_selection():
+    return [
+        name
+        for option_names in category_options.values()
+        for name in option_names
+        if name in all_options and all_options[name].get()
+    ]
+
+
+def apply_preset(option_names):
+    valid = {
+        name
+        for names in category_options.values()
+        for name in names
+    } & set(option_names)
+    for value in custom_text_values.values():
+        value.set("")
+    for selected in custom_multi_selected.values():
+        selected.clear()
+    bol1_value.set("")
+    bol2_value.set("")
+    bol3_value.set("")
+    ncr_selected.clear()
+    npr_selected.clear()
+    loyalty_selected.clear()
+    lottery_selected.clear()
+    timestamp_was = "Timestamp" in click_order
+    for name, var in all_options.items():
+        if name != "Timestamp":
+            var.set(name in valid)
+    click_order.clear()
+    click_order.extend(
+        name
+        for option_names in category_options.values()
+        for name in option_names
+        if name in valid
+    )
+    if timestamp_was:
+        click_order.append("Timestamp")
+    update_result()
+
+
+def preset_hotkey(event, key):
+    if event.widget.winfo_toplevel() is not root:
+        return
+    if event.widget.winfo_class() in ("Entry", "Text", "TEntry", "TCombobox"):
+        return
+    if key in presets:
+        apply_preset(presets[key])
+    return "break"
+
+
+def open_presets_dialog():
+    dialog = tk.Toplevel(root)
+    dialog.title("Presets")
+    dialog.transient(root)
+    dialog.configure(background=COLORS["background"])
+    dialog.iconbitmap(ICON_FILE)
+
+    tk.Label(
+        dialog,
+        text="Preset slots (press F1–F12 to load):",
+        background=COLORS["background"],
+        foreground=COLORS["text"],
+    ).pack(anchor="w", padx=12, pady=(12, 4))
+    listbox = tk.Listbox(
+        dialog,
+        height=12,
+        exportselection=False,
+        bg=COLORS["surface"],
+        fg=COLORS["text"],
+        selectbackground=COLORS["accent"],
+        selectforeground="#FFFFFF",
+        highlightthickness=1,
+        highlightbackground=COLORS["border"],
+        font=("Segoe UI", 9),
+    )
+    listbox.pack(fill="x", padx=12)
+    detail = tk.Label(
+        dialog,
+        text="",
+        wraplength=260,
+        justify="left",
+        background=COLORS["background"],
+        foreground=COLORS["muted"],
+        font=("Segoe UI", 8),
+    )
+    detail.pack(anchor="w", padx=12, pady=(6, 0))
+
+    preset_keys = [f"F{i}" for i in range(1, 13)]
+
+    def preset_summary(key):
+        names = presets.get(key, [])
+        if not names:
+            return "(empty)"
+        shown = ", ".join(names)
+        return shown if len(shown) <= 200 else shown[:197] + "..."
+
+    def refresh_list():
+        listbox.delete(0, tk.END)
+        for key in preset_keys:
+            listbox.insert(tk.END, f"{key}  —  {len(presets.get(key, []))} option(s)")
+        update_detail()
+
+    def selected_key():
+        selection = listbox.curselection()
+        if not selection:
+            return None
+        return preset_keys[selection[0]]
+
+    def update_detail(event=None):
+        key = selected_key()
+        detail.configure(text=preset_summary(key) if key else "")
+
+    def save_current():
+        key = selected_key()
+        if key is None:
+            return
+        presets[key] = current_option_selection()
+        if not save_customizations(custom_categories, custom_options):
+            presets.pop(key, None)
+            return
+        refresh_list()
+
+    def load_selected():
+        key = selected_key()
+        if key and key in presets:
+            apply_preset(presets[key])
+            dialog.destroy()
+
+    def clear_selected():
+        key = selected_key()
+        if key and key in presets:
+            presets.pop(key)
+            if not save_customizations(custom_categories, custom_options):
+                return
+            refresh_list()
+
+    buttons = tk.Frame(dialog, background=COLORS["background"])
+    buttons.pack(fill="x", padx=12, pady=10)
+    tk.Button(buttons, text="Save Current", width=12, command=save_current).pack(side="left")
+    tk.Button(buttons, text="Load", width=8, command=load_selected).pack(side="left", padx=(6, 0))
+    tk.Button(buttons, text="Clear", width=8, command=clear_selected).pack(side="left", padx=(6, 0))
+    tk.Button(buttons, text="Close", width=8, command=dialog.destroy).pack(side="right")
+
+    listbox.bind("<<ListboxSelect>>", update_detail)
+    refresh_list()
+    activate_popup(dialog, listbox)
+
+
 settings_menu = tk.Menu(
     root,
     tearoff=0,
@@ -2209,6 +2370,7 @@ settings_menu.add_command(
 settings_menu.add_command(label="Reorder Options", command=open_reorder_options_dialog)
 settings_menu.add_separator()
 settings_menu.add_command(label="Agent Name...", command=change_agent_name)
+settings_menu.add_command(label="Presets...", command=open_presets_dialog)
 settings_menu.add_separator()
 settings_menu.add_checkbutton(
     label="Dark Mode",
@@ -2292,6 +2454,11 @@ root.bind_all("<KeyPress-w>", navigate_options)
 root.bind_all("<KeyPress-W>", navigate_options)
 root.bind_all("<KeyPress-s>", navigate_options)
 root.bind_all("<KeyPress-S>", navigate_options)
+for _preset_i in range(1, 13):
+    root.bind_all(
+        f"<F{_preset_i}>",
+        lambda event, key=f"F{_preset_i}": preset_hotkey(event, key),
+    )
 root.update_idletasks()
 root.minsize(btn_frame.winfo_reqwidth() + 32, root.winfo_reqheight())
 if pending_window_size:
