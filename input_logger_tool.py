@@ -268,6 +268,11 @@ def save_customizations(
                     else saved_option_order,
                     "dark_mode": dark_mode_enabled,
                     "agent_name": agent_name,
+                    "window_size": (
+                        f"{root.winfo_width()}x{root.winfo_height()}"
+                        if "root" in globals() and root.winfo_ismapped()
+                        else None
+                    ),
                     "option_types": (
                         custom_option_types
                         if saved_option_types is None
@@ -1669,6 +1674,7 @@ customization_path = os.path.join(
     "customizations.json",
 )
 agent_name_configured = False
+pending_window_size = None
 try:
     with open(customization_path, "r", encoding="utf-8") as config_file:
         saved_customizations = json.load(config_file)
@@ -1685,6 +1691,7 @@ try:
     saved_option_order = saved_customizations.get("option_order")
     saved_dark_mode = saved_customizations.get("dark_mode", False)
     saved_agent_name = saved_customizations.get("agent_name", "Unknown")
+    saved_window_size = saved_customizations.get("window_size")
     saved_option_types = saved_customizations.get("option_types", {})
     saved_option_choices = saved_customizations.get("option_choices", {})
     if (
@@ -1868,6 +1875,10 @@ try:
     if isinstance(saved_agent_name, str) and saved_agent_name.strip():
         agent_name = saved_agent_name.strip()
         agent_name_configured = True
+    if isinstance(saved_window_size, str):
+        width, _, height = saved_window_size.partition("x")
+        if width.isdigit() and height.isdigit():
+            pending_window_size = f"{width}x{height}"
 except FileNotFoundError:
     pass
 except (OSError, json.JSONDecodeError, ValueError) as error:
@@ -2280,6 +2291,8 @@ root.bind_all("<KeyPress-s>", navigate_options)
 root.bind_all("<KeyPress-S>", navigate_options)
 root.update_idletasks()
 root.minsize(btn_frame.winfo_reqwidth() + 32, root.winfo_reqheight())
+if pending_window_size:
+    root.geometry(pending_window_size)
 
 if not agent_name_configured:
     startup_name = ask_agent_name()
@@ -2288,4 +2301,11 @@ if not agent_name_configured:
     save_customizations(custom_categories, custom_options)
     update_result()
 
+
+def on_closing():
+    save_customizations(custom_categories, custom_options)
+    root.destroy()
+
+
+root.protocol("WM_DELETE_WINDOW", on_closing)
 root.mainloop()
