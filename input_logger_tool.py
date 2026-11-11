@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import font, messagebox, simpledialog, ttk
+from tkinter import font, messagebox, ttk
 from datetime import datetime
 import json
 import sys
@@ -297,15 +297,15 @@ def add_option_checkbox(category_name, option_name):
         variable=all_options[option_name],
         command=lambda n=option_name: on_checkbox_toggle(n),
     )
-    checkbox.pack(anchor="w", pady=4)
+    checkbox.pack(anchor="w", pady=2)
     option_widgets[option_name] = checkbox
 
 
 def add_category_tab(category_name):
     frame = tk.Frame(
         options_notebook,
-        padx=14,
-        pady=12,
+        padx=10,
+        pady=8,
         background=COLORS["surface"],
     )
     category_frames[category_name] = frame
@@ -316,17 +316,11 @@ def add_category_tab(category_name):
 
 
 def add_new_category():
-    category_name = simpledialog.askstring(
+    category_name = ask_text_dialog(
         "Add New Category",
         "Enter a name for the new category:",
-        parent=root,
     )
     if category_name is None:
-        return
-
-    category_name = category_name.strip()
-    if not category_name:
-        messagebox.showwarning("Invalid Category", "Category name cannot be empty.", parent=root)
         return
     reserved_categories = {
         name.casefold()
@@ -442,7 +436,7 @@ def add_new_option():
             name.casefold()
             for option_names in default_category_options.values()
             for name in option_names
-        }
+        } - {name.casefold() for name in hidden_options}
         if (
             option_name.casefold() == "timestamp"
             or option_name.casefold() in reserved_options
@@ -1320,7 +1314,7 @@ def open_multi_checkbox_popup(name, options_list, selected_list):
             variable=var,
             style="MultiChoice.TCheckbutton",
         )
-        cb.pack(anchor="w", fill="x", pady=2)
+        cb.pack(anchor="w", pady=2)
         vars.append((opt, var))
         widgets.append(cb)
 
@@ -1497,10 +1491,15 @@ def apply_theme_styles():
         foreground=COLORS["text"],
         padding=(4, 3),
     )
+    focus_bg = COLORS["accent"]
+    focus_fg = "#FFFFFF" if not dark_mode_enabled else COLORS["background"]
     style.map(
         "TCheckbutton",
-        foreground=[("active", COLORS["accent"])],
-        background=[("active", COLORS["surface"])],
+        foreground=[("active", COLORS["accent"]), ("focus", focus_fg)],
+        background=[
+            ("active", COLORS["surface"]),
+            ("focus", focus_bg),
+        ],
     )
     style.configure(
         "MultiChoice.TCheckbutton",
@@ -1510,8 +1509,14 @@ def apply_theme_styles():
     )
     style.map(
         "MultiChoice.TCheckbutton",
-        foreground=[("active", COLORS["accent"])],
-        background=[("active", COLORS["surface"])],
+        foreground=[
+            ("active", COLORS["accent"]),
+            ("focus", focus_fg),
+        ],
+        background=[
+            ("active", COLORS["surface"]),
+            ("focus", focus_bg),
+        ],
         indicatorcolor=[
             ("selected", COLORS["accent"]),
             ("!selected", COLORS["border"]),
@@ -1612,6 +1617,11 @@ def apply_theme():
             activebackground=COLORS["accent"],
             activeforeground="#FFFFFF",
         )
+    if "credit_label" in globals():
+        credit_label.configure(
+            background=COLORS["surface"],
+            foreground=COLORS["muted"],
+        )
     if "update_timestamp_indicator" in globals():
         update_timestamp_indicator()
 
@@ -1629,8 +1639,10 @@ options_notebook = ttk.Notebook(root, height=0)
 options_notebook.pack(fill="both", expand=True, padx=16, pady=(8, 4))
 
 default_category_options = {
-    "Crunchtime": ["Bill Of Lading [1]", "Bill Of Lading [2]", "Bill Of Lading [3]", "Veeder Root", "Payout", "Coupon", "Lottery", "Titan Series", "Change Order"],
-    "CNG": ["EMR", "NCR", "NPR", "Loyalty", "Drive Off", "Pop Discount", "Adjusted Fuel Deposit"],
+    "CT": ["Bill Of Lading [1]", "Bill Of Lading [2]", "Bill Of Lading [3]", "Veeder Root", "Payout", "Coupon", "Lottery", "Titan Series", "Banking Page", "Change Order"],
+    "CNG": ["Department Sales", "Fuel Tier", "EMR", "NCR", "NPR", "Loyalty", "Pop Discount", "Drive Off", "MOP", "Adjusted Fuel Deposit", "KKC", "Man Debit", "Travelers"],
+    "FT": ["Comdata", "QSR Safe Drops", "TCH", "Sales and Cash Reconciliation"],
+    "A": ["CW Discount", "SE Rewards", "Coin Box", "Gas", "JUUL Pods", "JUUL Devices", "EDC", "CHP"],
 }
 category_options = {
     name: list(option_names)
@@ -1764,6 +1776,7 @@ try:
     }
     used_option_names.update(name.casefold() for name in option_labels.values())
     used_option_names.add("timestamp")
+    used_option_names -= {name.casefold() for name in hidden_options}
     for category_name, option_names in saved_categories.items():
         if (
             not isinstance(category_name, str)
@@ -2047,6 +2060,14 @@ class ToolTip:
 settings_tooltip = ToolTip(settings_button, "Settings")
 timestamp_tooltip = ToolTip(timestamp_button, "Timestamp (Click or press ` to toggle)")
 
+credit_label = tk.Label(
+    root,
+    text="Credited to Maal",
+    font=("Segoe UI", 8),
+    foreground=COLORS["muted"],
+    background=COLORS["surface"],
+)
+
 
 def place_settings_button(event=None):
     if not options_notebook.winfo_ismapped():
@@ -2071,6 +2092,10 @@ def place_settings_button(event=None):
             x=settings_x - ts_w - 6,
             y=ts_y,
         )
+    credit_label.place(
+        x=nb_x + nb_w - credit_label.winfo_reqwidth() - 6,
+        y=nb_y + options_notebook.winfo_height() - credit_label.winfo_reqheight() - 2,
+    )
 
 
 place_settings_button()
@@ -2078,19 +2103,61 @@ root.after_idle(place_settings_button)
 root.bind("<Configure>", place_settings_button)
 options_notebook.bind("<Configure>", place_settings_button)
 
+def ask_text_dialog(title, prompt, initialvalue=""):
+    dialog = tk.Toplevel(root)
+    dialog.title(title)
+    dialog.transient(root)
+    dialog.configure(background=COLORS["background"])
+    dialog.iconbitmap(ICON_FILE)
+
+    name_var = tk.StringVar(value=initialvalue)
+    tk.Label(
+        dialog,
+        text=prompt,
+        background=COLORS["background"],
+        foreground=COLORS["text"],
+    ).pack(anchor="w", padx=12, pady=(12, 4))
+    entry = tk.Entry(dialog, textvariable=name_var, width=24)
+    entry.pack(fill="x", padx=12)
+    chosen = {"name": None}
+
+    def confirm(event=None):
+        value = name_var.get().strip()
+        if not value:
+            messagebox.showwarning(
+                "Invalid",
+                "This field cannot be empty.",
+                parent=dialog,
+            )
+            entry.focus_set()
+            return
+        chosen["name"] = value
+        dialog.destroy()
+
+    buttons = tk.Frame(dialog, background=COLORS["background"])
+    buttons.pack(pady=10)
+    tk.Button(buttons, text="OK", width=10, command=confirm).pack(side="left", padx=5)
+    tk.Button(
+        buttons,
+        text="Cancel",
+        width=10,
+        command=dialog.destroy,
+    ).pack(side="left", padx=5)
+    dialog.bind("<Return>", confirm)
+    dialog.bind("<Escape>", lambda event: dialog.destroy())
+    activate_popup(dialog, entry)
+    dialog.wait_window()
+    return chosen["name"]
+
+
+def ask_agent_name():
+    return ask_text_dialog("Agent Name", "Enter the agent name:", agent_name)
+
+
 def change_agent_name():
     global agent_name
-    new_name = simpledialog.askstring(
-        "Agent Name",
-        "Enter the agent name:",
-        initialvalue=agent_name,
-        parent=root,
-    )
-    if new_name is None:
-        return
-    new_name = new_name.strip()
-    if not new_name:
-        messagebox.showwarning("Invalid Name", "Agent name cannot be empty.", parent=root)
+    new_name = ask_agent_name()
+    if new_name is None or new_name == agent_name:
         return
     previous_name = agent_name
     agent_name = new_name
@@ -2161,7 +2228,7 @@ result_frame = tk.Frame(root, background=COLORS["background"])
 result_frame.pack(fill="x", padx=16, pady=(4, 12))
 result = tk.Text(
     result_frame,
-    height=4,
+    height=3,
     width=1,
     state="disabled",
     wrap="word",
@@ -2174,30 +2241,24 @@ result = tk.Text(
     highlightbackground=COLORS["border"],
     highlightcolor=COLORS["accent"],
     padx=10,
-    pady=9,
+    pady=6,
 )
-result.pack(fill="x", pady=(0, 10))
+result.pack(fill="x", pady=(0, 8))
 btn_frame = tk.Frame(result_frame, background=COLORS["background"])
 btn_frame.pack(anchor="center")
 ttk.Button(
     btn_frame,
     text="Copy",
     style="Accent.TButton",
-    width=12,
+    width=7,
     command=copy_to_clipboard,
 ).pack(side="left")
 ttk.Button(
     btn_frame,
     text="Clear",
-    width=12,
+    width=7,
     command=clear_all,
-).pack(side="left", padx=(8, 0))
-ttk.Label(
-    result_frame,
-    text="Credited to Maal",
-    font=("Segoe UI", 8),
-    foreground=COLORS["muted"],
-).pack(anchor="center", pady=(6, 0))
+).pack(side="left", padx=(6, 0))
 
 def refresh_timestamp():
     if all_options["Timestamp"].get(): update_result()
@@ -2221,14 +2282,9 @@ root.update_idletasks()
 root.minsize(btn_frame.winfo_reqwidth() + 32, root.winfo_reqheight())
 
 if not agent_name_configured:
-    startup_name = simpledialog.askstring(
-        "Welcome",
-        "Enter your agent name:",
-        initialvalue=agent_name,
-        parent=root,
-    )
-    if startup_name is not None and startup_name.strip():
-        agent_name = startup_name.strip()
+    startup_name = ask_agent_name()
+    if startup_name is not None:
+        agent_name = startup_name
     save_customizations(custom_categories, custom_options)
     update_result()
 
