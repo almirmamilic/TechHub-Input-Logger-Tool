@@ -2263,6 +2263,66 @@ def preset_hotkey(event, key):
     return "break"
 
 
+def reset_to_defaults():
+    global category_options
+    if not messagebox.askyesno(
+        "Reset to Defaults",
+        "This will remove all custom categories, options, renames, ordering, "
+        "and presets, and restore the default tabs. Continue?",
+        parent=root,
+    ):
+        return
+
+    custom_categories.clear()
+    custom_options.clear()
+    hidden_categories.clear()
+    hidden_options.clear()
+    category_labels.clear()
+    option_labels.clear()
+    custom_option_types.clear()
+    custom_option_choices.clear()
+    custom_text_values.clear()
+    custom_multi_selected.clear()
+    presets.clear()
+    option_action_names.clear()
+    category_action_names.clear()
+    category_options = {
+        name: list(option_names)
+        for name, option_names in default_category_options.items()
+    }
+    for category_name in category_options:
+        category_action_names[category_name] = category_name
+    for option_names in category_options.values():
+        for option_name in option_names:
+            option_action_names[option_name] = option_name
+
+    for frame in list(category_frames.values()):
+        options_notebook.forget(frame)
+        frame.destroy()
+    category_frames.clear()
+    option_widgets.clear()
+    all_options.clear()
+    click_order.clear()
+    bol1_value.set("")
+    bol2_value.set("")
+    bol3_value.set("")
+    ncr_selected.clear()
+    npr_selected.clear()
+    loyalty_selected.clear()
+    lottery_selected.clear()
+
+    for category_name in category_options:
+        add_category_tab(category_name)
+    for name in additional_options:
+        all_options[name] = tk.BooleanVar()
+
+    if not save_customizations(custom_categories, custom_options):
+        return
+    options_notebook.select(options_notebook.tabs()[0])
+    update_result()
+    root.focus_set()
+
+
 def open_presets_dialog():
     dialog = tk.Toplevel(root)
     dialog.title("Presets")
@@ -2401,6 +2461,8 @@ settings_menu.add_checkbutton(
     variable=always_on_top_var,
     command=toggle_always_on_top,
 )
+settings_menu.add_separator()
+settings_menu.add_command(label="Reset to Defaults...", command=reset_to_defaults)
 
 
 def open_settings_menu(event=None):
