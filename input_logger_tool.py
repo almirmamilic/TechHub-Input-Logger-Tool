@@ -56,6 +56,9 @@ presets = {}
 
 def on_checkbox_toggle(name):
     """Tracks the order of clicks and opens popups"""
+    snapshot = take_state_snapshot()
+    snapshot["checked"][name] = not all_options[name].get()
+    push_undo(snapshot)
     action_name = option_action_names.get(name, name)
     if all_options[name].get():
         if name not in click_order:
@@ -190,7 +193,86 @@ def copy_to_clipboard(event=None):
     root.clipboard_append(result.get("1.0", tk.END).strip())
     root.update()
 
+
+undo_history = []
+redo_history = []
+MAX_HISTORY = 50
+
+
+def take_state_snapshot():
+    return {
+        "checked": {n: v.get() for n, v in all_options.items()},
+        "click_order": list(click_order),
+        "text_values": {n: v.get() for n, v in custom_text_values.items()},
+        "multi_selected": {n: list(s) for n, s in custom_multi_selected.items()},
+        "bol": (bol1_value.get(), bol2_value.get(), bol3_value.get()),
+        "ncr": list(ncr_selected),
+        "npr": list(npr_selected),
+        "loyalty": list(loyalty_selected),
+        "lottery": list(lottery_selected),
+    }
+
+
+def push_undo(snapshot):
+    undo_history.append(snapshot)
+    if len(undo_history) > MAX_HISTORY:
+        undo_history.pop(0)
+    redo_history.clear()
+
+
+def restore_state(snapshot):
+    for name, var in all_options.items():
+        if name in snapshot["checked"]:
+            var.set(snapshot["checked"][name])
+    click_order.clear()
+    click_order.extend(snapshot["click_order"])
+    for name, value in snapshot["text_values"].items():
+        if name in custom_text_values:
+            custom_text_values[name].set(value)
+    for name, selected in snapshot["multi_selected"].items():
+        if name in custom_multi_selected:
+            custom_multi_selected[name][:] = selected
+    bol1_value.set(snapshot["bol"][0])
+    bol2_value.set(snapshot["bol"][1])
+    bol3_value.set(snapshot["bol"][2])
+    ncr_selected[:] = snapshot["ncr"]
+    npr_selected[:] = snapshot["npr"]
+    loyalty_selected[:] = snapshot["loyalty"]
+    lottery_selected[:] = snapshot["lottery"]
+    update_result()
+
+
+def undo_redo_guard(event):
+    if event is not None and (
+        event.widget.winfo_toplevel() is not root
+        or event.widget.winfo_class() in ("Entry", "Text", "TEntry", "TCombobox")
+    ):
+        return True
+    return False
+
+
+def undo(event=None):
+    if undo_redo_guard(event):
+        return
+    if not undo_history:
+        return "break"
+    redo_history.append(take_state_snapshot())
+    restore_state(undo_history.pop())
+    return "break"
+
+
+def redo(event=None):
+    if undo_redo_guard(event):
+        return
+    if not redo_history:
+        return "break"
+    undo_history.append(take_state_snapshot())
+    restore_state(redo_history.pop())
+    return "break"
+
+
 def clear_all():
+    push_undo(take_state_snapshot())
     for name, var in all_options.items():
         var.set(False)
     for value in custom_text_values.values():
@@ -2227,6 +2309,7 @@ def current_option_selection():
 
 
 def apply_preset(option_names):
+    push_undo(take_state_snapshot())
     preset_set = {
         name
         for names in category_options.values()
@@ -2529,6 +2612,10 @@ def refresh_timestamp():
 refresh_timestamp()
 root.bind('<Delete>', lambda e: clear_all())
 root.bind('<Control-c>', copy_to_clipboard)
+root.bind_all("<Control-z>", undo)
+root.bind_all("<Control-Z>", undo)
+root.bind_all("<Control-y>", redo)
+root.bind_all("<Control-Y>", redo)
 root.bind_all("<KeyPress-grave>", toggle_timestamp)
 root.bind_all("<KeyPress-a>", navigate_tabs)
 root.bind_all("<KeyPress-A>", navigate_tabs)
