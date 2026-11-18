@@ -189,6 +189,13 @@ def update_result():
     result.config(state="disabled")
 
 def copy_to_clipboard(event=None):
+    if event is not None and event.widget.winfo_class() in (
+        "Entry",
+        "Text",
+        "TEntry",
+        "TCombobox",
+    ):
+        return
     root.clipboard_clear()
     root.clipboard_append(result.get("1.0", tk.END).strip())
     root.update()
@@ -2611,7 +2618,8 @@ def refresh_timestamp():
 
 refresh_timestamp()
 root.bind('<Delete>', lambda e: clear_all())
-root.bind('<Control-c>', copy_to_clipboard)
+root.bind_all("<Control-c>", copy_to_clipboard)
+root.bind_all("<Control-C>", copy_to_clipboard)
 root.bind_all("<Control-z>", undo)
 root.bind_all("<Control-Z>", undo)
 root.bind_all("<Control-y>", redo)
